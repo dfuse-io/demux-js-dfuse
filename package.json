@@ -39,7 +39,7 @@
     "lint": "tslint 'src/**/*.ts'",
     "lint:specific": "tslint",
     "start": "tsc --module commonjs --watch",
-    "run:example": "ts-node -O '{\"module\":\"commonjs\"}' example/index.ts",
+    "run:example": "node --inspect -r ts-node/register example/index.ts",
     "test": "jest"
   },
   "husky": {
@@ -92,7 +92,13 @@
   },
   "dependencies": {
     "@dfuse/client": "^0.2.6",
+    "apollo-boost": "^0.4.3",
+    "apollo-cache-inmemory": "^1.6.2",
+    "apollo-client": "^2.6.3",
+    "apollo-link-ws": "^1.0.18",
     "demux": "^4.0.0",
+    "graphql": "^14.3.1",
+    "subscriptions-transport-ws": "^0.9.16",
     "ws": "^7.0.1"
   }
 }

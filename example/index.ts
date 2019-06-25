@@ -1,8 +1,3 @@
-import dotenv from "dotenv"
-dotenv.config()
-
-// todo throw an error if not api key is defined in a .env file?
-
 /*
  * To tie everything together, we must instantiate our Action Handler and Action Reader, and instantiate an Action
  * Watcher with both of those.
@@ -10,6 +5,14 @@ dotenv.config()
 
 import { BaseActionWatcher } from "demux"
 import { DfuseActionReader } from "../src/"
+import dotenv from "dotenv"
+
+dotenv.config()
+
+if (process.env.DFUSE_API_KEY == null) {
+  console.log("Missing DFUSE_API_KEY environment variable")
+  process.exit(1)
+}
 
 const ObjectActionHandler = require("./ObjectActionHandler")
 const handlerVersion = require("./handlerVersions/v1")
@@ -28,7 +31,7 @@ const actionHandler = new ObjectActionHandler([handlerVersion])
  * mode, where we start at an offset of the most recent blocks.
  */
 const actionReader = new DfuseActionReader({
-  startAtBlock: 50000000,
+  startAtBlock: 65414000,
   onlyIrreversible: false,
   dfuseApiKey: process.env.DFUSE_API_KEY as string,
   network: "mainnet"
