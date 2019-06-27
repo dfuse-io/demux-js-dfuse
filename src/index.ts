@@ -269,9 +269,13 @@ export class DfuseActionReader extends AbstractActionReader {
   protected async setup(): Promise<void> {}
 
   public async getBlock(blockNumber: number): Promise<Block> {
-    await waitUntil(() => this.blockQueue.length > 0)
+    await waitUntil(
+      () => this.blockQueue.length > 0 && this.blockQueue[0].blockInfo.blockNumber >= blockNumber
+    )
+
     // console.log("getBlock", blockNumber, this.headBlockNumber, this.lastIrreversibleBlockNumber)
     // console.log("in queue", this.blockQueue.map((x) => x.blockInfo.blockNumber))
+
     const queuedBlock = this.blockQueue[0]
     const queuedBlockNumber = queuedBlock.blockInfo.blockNumber
 
@@ -287,6 +291,13 @@ export class DfuseActionReader extends AbstractActionReader {
       return defaultBlock
     } else if (queuedBlockNumber === blockNumber) {
       this.blockQueue.shift()
+
+      // Hack to make the block's previousHash property match the previous block,
+      // if the previous block wasnt returned by dfuse and we had to return a default block
+      if (this.currentBlockData.blockInfo.blockHash === "") {
+        queuedBlock.blockInfo.previousBlockHash = ""
+      }
+
       return queuedBlock
     } else {
       throw new Error(
