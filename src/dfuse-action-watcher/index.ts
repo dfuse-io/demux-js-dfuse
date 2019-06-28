@@ -1,7 +1,7 @@
 import { AbstractActionReader, ActionReaderOptions, Block } from "demux"
-import ApolloClient from "apollo-client/ApolloClient"
 import { gql } from "apollo-boost"
-import { getApolloClient, waitUntil } from "./util"
+import { getApolloClient, waitUntil } from "../util"
+import { DfuseBlockStreamer } from "../dfuse-block-streamer"
 
 type DfuseActionReaderOptions = ActionReaderOptions & {
   dfuseApiKey: string
@@ -37,17 +37,15 @@ const block2: Block = {
 }
 
 export class DfuseActionReader extends AbstractActionReader {
-  protected network: string
-  protected dfuseApiKey: string
-  protected apolloClient: ApolloClient<any>
   protected headInfoInitialized: boolean = false
   protected activeCursor: string = ""
   protected blockQueue: Block[] = []
+  protected blockStreamer: DfuseBlockStreamer
 
   constructor(options: DfuseActionReaderOptions) {
     super(options)
-    this.dfuseApiKey = options.dfuseApiKey
-    this.network = options.network || "mainnet"
+
+    const { dfuseApiKey, network, startAtBlock } = options
 
     // Patch for an issue where dfuse doesnt return blocks 1 and 2
     if (this.startAtBlock > 0 && this.startAtBlock < 3) {
@@ -55,144 +53,45 @@ export class DfuseActionReader extends AbstractActionReader {
       this.currentBlockNumber = 2
     }
 
-    this.apolloClient = getApolloClient(this.dfuseApiKey, this.network)
+    this.blockStreamer = new DfuseBlockStreamer({
+      dfuseApiKey,
+      network,
+      lowBlockNum: startAtBlock
+    })
 
-    this.streamTransactions()
+    this.onBlock = this.onBlock.bind(this)
+    this.streamBlocks()
   }
 
-  /**
-   * Creates a GraphQL subscription, listening for the provided SQE query.
-   * GraphQL returns transactions which are grouped together by block, and
-   * then pushed into a queue.
-   */
-  private async streamTransactions() {
-    let currentBlockNumber: number = -1
-    let currentBlock: Block
+  private onBlock(block: Block, lastIrreversibleBlockNumber: number) {
+    /*
+     * When we are seeing a new block, we need to update our head reference
+     * Math.max is used in case an "undo" trx is returned, with a lower block
+     * number than our head reference.
+     */
+    this.headBlockNumber = Math.max(this.headBlockNumber, block.blockInfo.blockNumber)
 
-    this.apolloClient
-      .subscribe({
-        query: gql`
-          subscription($cursor: String!, $lowBlockNum: Int64) {
-            searchTransactionsForward(
-              query: "status:executed"
-              cursor: $cursor
-              lowBlockNum: $lowBlockNum
-            ) {
-              undo
-              irreversibleBlockNum
-              trace {
-                id
-                block {
-                  num
-                  id
-                  previous
-                  timestamp
-                }
-                matchingActions {
-                  account
-                  name
-                  data
-                  authorization {
-                    actor
-                    permission
-                  }
-                }
-              }
-            }
-          }
-        `,
-        variables: {
-          cursor: this.activeCursor,
-          lowBlockNum: this.currentBlockNumber
-        }
-      })
-      .subscribe({
-        start: (subscription) => {
-          this.log.info("Started", subscription)
-        },
-        next: (value) => {
-          const message = value.data.searchTransactionsForward
-          const { undo, trace, irreversibleBlockNum } = message
-          const { matchingActions, block } = trace
+    /*
+     * Update the reference to the last irreversible block number,
+     * making sure we are not receiving an outdated reference in the case of an undo
+     ? is this possible?
+     */
+    this.lastIrreversibleBlockNumber = Math.max(
+      this.lastIrreversibleBlockNumber,
+      lastIrreversibleBlockNumber
+    )
 
-          // todo figure out how to handle this
-          if (undo) {
-            console.log("undo", undo)
-          }
-
-          const isFirstProcessed = currentBlockNumber === -1
-          const isNewBlock = block.num !== currentBlockNumber
-
-          /*
-           * When we are seeing a new block, we need to update our head reference
-           * Math.max is used in case an "undo" trx is returned, with a lower block
-           * number than our head reference.
-           */
-          if (isNewBlock) {
-            this.headBlockNumber = Math.max(this.headBlockNumber, currentBlockNumber)
-          }
-
-          /*
-           * When we see a transaction belonging to a different block than
-           * the previous one, we pushed the previous block into the queue
-           */
-          if (!isFirstProcessed && isNewBlock) {
-            this.blockQueue.push(currentBlock)
-          }
-
-          /*
-           * Update the reference to the last irreversible block number,
-           * making sure we are not receiving an outdated reference in the case of an undo
-           ? is this possible?
-           */
-          this.lastIrreversibleBlockNumber = Math.max(
-            this.lastIrreversibleBlockNumber,
-            irreversibleBlockNum
-          )
-
-          // Create a new block object
-          if (isNewBlock) {
-            currentBlockNumber = message.trace.block.num
-            currentBlock = {
-              actions: [],
-              blockInfo: {
-                blockNumber: block.num,
-                blockHash: block.id,
-                previousBlockHash: block.previous,
-                timestamp: block.timestamp
-              }
-            }
-          }
-
-          // Insert matching actions into the right block
-          matchingActions.forEach((action: any) => {
-            currentBlock.actions.push({
-              type: `${action.account}::${action.name}`,
-              payload: {
-                transactionId: trace.id,
-                actionIndex: 0,
-                account: action.account,
-                name: action.name,
-                authorization: action.authorization,
-                data: action.data
-              }
-            })
-          })
-
-          this.activeCursor = message.cursor
-        },
-        error: (error) => {
-          // TODO: how to handle subscription errors? Invalid queries?
-          this.log.error("Error", error)
-        },
-        complete: () => {
-          // TODO: how to handle completion? Will we ever reach completion?
-          this.log.info("Completed")
-        }
-      })
+    this.blockQueue.push(block)
   }
 
-  protected async setup(): Promise<void> {}
+  private async streamBlocks(): Promise<void> {
+    this.blockStreamer.addOnBlockListener(this.onBlock)
+    this.blockStreamer.stream()
+  }
+
+  protected async setup(): Promise<void> {
+    return
+  }
 
   public async getBlock(blockNumber: number): Promise<Block> {
     // Patch around the issues caused by Dfuse not returning anything for blocks 1 and 2
@@ -244,5 +143,7 @@ export class DfuseActionReader extends AbstractActionReader {
   }
 
   // todo do we need to resolve forks, or is dfuse handling all of this for us?
-  protected async resolveFork() {}
+  protected async resolveFork() {
+    return
+  }
 }

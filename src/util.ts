@@ -4,6 +4,7 @@ import WebSocketConnection from "ws"
 import { WebSocketLink } from "apollo-link-ws"
 import { SubscriptionClient } from "subscriptions-transport-ws"
 import { InMemoryCache } from "apollo-boost"
+import ApolloClient from "apollo-client/ApolloClient"
 
 function getDfuseClient(apiKey: string, network: string) {
   /*
@@ -38,7 +39,7 @@ function getDfuseClient(apiKey: string, network: string) {
   })
 }
 
-export function getApolloClient(apiKey: string, network: string) {
+export function getApolloClient(apiKey: string, network: string = "mainnet") {
   const dfuseClient = getDfuseClient(apiKey, network)
 
   const subscriptionClient = new SubscriptionClient(
@@ -62,6 +63,7 @@ export function getApolloClient(apiKey: string, network: string) {
     WebSocketConnection
   )
 
+  // TODO: how should this be handled?
   subscriptionClient.onConnecting(() => {
     console.log("Connecting")
   })

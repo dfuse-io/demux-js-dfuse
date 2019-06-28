@@ -3,19 +3,27 @@
  * Watcher with both of those.
  */
 
-import { DfuseActionReader } from "../src"
 import dotenv from "dotenv"
 import { BaseActionWatcher } from "demux"
-
+import { DfuseActionReader } from "../src"
 dotenv.config()
 
 if (process.env.DFUSE_API_KEY == null) {
-  console.log("Missing DFUSE_API_KEY environment variable")
+  console.log(
+    "Missing DFUSE_API_KEY environment variable. Visit https://www.dfuse.io to create your API key."
+  )
   process.exit(1)
 }
 
+/*
+ * Using requires because there are no type definitions for
+ * these js files copied over from the demux-js examples.
+ * import statements will required types
+ */
+/* tslint:disable:no-var-requires */
 const ObjectActionHandler = require("./ObjectActionHandler")
 const handlerVersion = require("./handlerVersions/v1")
+/* tslint:enable:no-var-requires */
 
 /*
  * This ObjectActionHandler, which does not change the signature from its parent AbstractActionHandler, takes an array
@@ -33,11 +41,11 @@ const actionHandler = new ObjectActionHandler([handlerVersion])
 const dfuseActionReader = new DfuseActionReader({
   startAtBlock: 0, // default is 1, which means start at genesis block
   onlyIrreversible: false,
-  dfuseApiKey: process.env.DFUSE_API_KEY as string,
-  network: "mainnet"
+  dfuseApiKey: process.env.DFUSE_API_KEY as string
+  // network: "mainnet" // Default is "mainnet"
 })
 
-const actionWatcher = new BaseActionWatcher(dfuseActionReader, actionHandler, 125)
+const actionWatcher = new BaseActionWatcher(dfuseActionReader, actionHandler, 100)
 
 actionWatcher.watch()
 
