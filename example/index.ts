@@ -31,7 +31,7 @@ const actionHandler = new ObjectActionHandler([handlerVersion])
  * mode, where we start at an offset of the most recent blocks.
  */
 const dfuseActionReader = new DfuseActionReader({
-  startAtBlock: 65582500, // default is 1, which means start at genesis block
+  startAtBlock: 0, // default is 1, which means start at genesis block
   onlyIrreversible: false,
   dfuseApiKey: process.env.DFUSE_API_KEY as string,
   network: "mainnet"
