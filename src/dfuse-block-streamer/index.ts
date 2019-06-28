@@ -9,19 +9,52 @@ export type DfuseBlockStreamerOptions = {
   lowBlockNum?: number
 }
 
+export type Transaction = {
+  undo: boolean
+  irreversibleBlockNum: number
+  cursor: string
+  trace: {
+    id: string
+    matchingActions: {
+      account: string
+      name: string
+      data: {}
+      authorization: {
+        actor: string
+        permission: string
+      }[]
+    }[]
+    block: {
+      num: number
+      id: string
+      previous: string
+      timestamp: Date
+    }
+  }
+}
+
 type OnBlockListener = (block: Block, lastIrreversibleBlockNumber: number) => void
 
 export class DfuseBlockStreamer {
-  protected apolloClient: ApolloClient<any>
+  protected dfuseApiKey: string
+  protected network: string
+  protected apolloClient?: ApolloClient<any>
   protected listeners: OnBlockListener[] = []
   protected activeCursor: string = ""
   protected lowBlockNum: number
+  protected currentBlockNumber: number = -1
+  protected currentBlock?: Block
 
   constructor(options: DfuseBlockStreamerOptions) {
-    const { dfuseApiKey, network, lowBlockNum } = options
+    const { lowBlockNum } = options
 
+    this.dfuseApiKey = options.dfuseApiKey
+    this.network = options.network || "mainnet"
     this.lowBlockNum = typeof lowBlockNum !== "undefined" ? lowBlockNum : 1
-    this.apolloClient = getApolloClient(dfuseApiKey, network || "mainnet")
+  }
+
+  private getApolloClient() {
+    return getApolloClient(this.dfuseApiKey, this.network)
   }
 
   /**
@@ -29,80 +62,84 @@ export class DfuseBlockStreamer {
    * registered listeners every time a new block is completed
    */
   public stream() {
-    let currentBlockNumber: number = -1
-    let currentBlock: Block
+    if (!this.apolloClient) {
+      this.apolloClient = this.getApolloClient()
+    }
 
     const subscription = this.getObservableSubscription({
-      apolloClient: this.apolloClient,
+      apolloClient: this.apolloClient!,
       lowBlockNum: this.lowBlockNum
     })
 
     subscription.subscribe({
-      // start: (subscription) => {
-      //   // this.log.info("Started", subscription)
-      // },
+      start: (subscription) => {
+        console.log("Started", subscription)
+      },
       next: (value) => {
-        const message = value.data.searchTransactionsForward
-        const { undo, trace, irreversibleBlockNum } = message
-        const { matchingActions, block } = trace
-
-        // todo figure out how to handle undos
-        if (undo) {
-          console.log("undo", undo)
-        }
-
-        const isFirstProcessed = currentBlockNumber === -1
-        const isNewBlock = block.num !== currentBlockNumber
-
-        /*
-         * When we see a transaction belonging to a different block than
-         * the previous one, we pushed the previous block into the queue
-         */
-        if (!isFirstProcessed && isNewBlock) {
-          this.notifyListeners(currentBlock, irreversibleBlockNum)
-        }
-
-        // Create a new block object
-        if (isNewBlock) {
-          currentBlockNumber = message.trace.block.num
-          currentBlock = {
-            actions: [],
-            blockInfo: {
-              blockNumber: block.num,
-              blockHash: block.id,
-              previousBlockHash: block.previous,
-              timestamp: block.timestamp
-            }
-          }
-        }
-
-        // Insert matching actions into the right block
-        matchingActions.forEach((action: any) => {
-          currentBlock.actions.push({
-            type: `${action.account}::${action.name}`,
-            payload: {
-              transactionId: trace.id,
-              actionIndex: 0,
-              account: action.account,
-              name: action.name,
-              authorization: action.authorization,
-              data: action.data
-            }
-          })
-        })
-
-        // TODO: This isn't currently doing anything
-        this.activeCursor = message.cursor
+        this.onTransactionReceived(value.data.searchTransactionsForward)
+      },
+      error: (error) => {
+        // TODO: how to handle subscription errors? Invalid queries?
+        console.log("Error", error)
+      },
+      complete: () => {
+        // TODO: how to handle completion? Will we ever reach completion?
+        console.log("Completed")
       }
-      // error: (error) => {
-      //   // TODO: how to handle subscription errors? Invalid queries?
-      //   // this.log.error("Error", error)
-      // },
-      // complete: () => {
-      //   // TODO: how to handle completion? Will we ever reach completion?
-      //   // this.log.info("Completed")
-      // }
     })
+  }
+
+  private onTransactionReceived(transaction: Transaction) {
+    const { undo, trace, irreversibleBlockNum } = transaction
+    const { matchingActions, block } = trace
+
+    // todo figure out how to handle undos
+    if (undo) {
+      console.log("undo", undo)
+    }
+
+    const isFirstProcessed = this.currentBlockNumber === -1
+    const isNewBlock = block.num !== this.currentBlockNumber
+
+    /*
+     * When we see a transaction belonging to a different block than
+     * the previous one, we pushed the previous block into the queue
+     */
+    if (!isFirstProcessed && isNewBlock) {
+      this.notifyListeners(this.currentBlock!, irreversibleBlockNum)
+    }
+
+    // Create a new block object
+    if (isNewBlock) {
+      this.currentBlockNumber = transaction.trace.block.num
+      this.currentBlock = {
+        actions: [],
+        blockInfo: {
+          blockNumber: block.num,
+          blockHash: block.id,
+          previousBlockHash: block.previous,
+          timestamp: block.timestamp
+        }
+      }
+    }
+
+    // Insert matching actions into the right block
+    matchingActions.forEach((action: any) => {
+      this.currentBlock!.actions.push({
+        type: `${action.account}::${action.name}`,
+        payload: {
+          transactionId: trace.id,
+          actionIndex: 0,
+          account: action.account,
+          name: action.name,
+          authorization: action.authorization,
+          data: action.data
+        }
+      })
+    })
+
+    // TODO: This isn't currently doing anything
+    this.activeCursor = transaction.cursor
   }
 
   /**
