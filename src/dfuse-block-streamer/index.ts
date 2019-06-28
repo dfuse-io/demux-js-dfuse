@@ -72,20 +72,20 @@ export class DfuseBlockStreamer {
     })
 
     subscription.subscribe({
-      start: (subscription) => {
-        console.log("Started", subscription)
-      },
+      // start: (subscription) => {
+      //   console.log("Started", subscription)
+      // },
       next: (value) => {
         this.onTransactionReceived(value.data.searchTransactionsForward)
-      },
-      error: (error) => {
-        // TODO: how to handle subscription errors? Invalid queries?
-        console.log("Error", error)
-      },
-      complete: () => {
-        // TODO: how to handle completion? Will we ever reach completion?
-        console.log("Completed")
       }
+      // error: (error) => {
+      //   // TODO: how to handle subscription errors? Invalid queries?
+      //   console.log("Error", error)
+      // },
+      // complete: () => {
+      //   // TODO: how to handle completion? Will we ever reach completion?
+      //   console.log("Completed")
+      // }
     })
   }
 
