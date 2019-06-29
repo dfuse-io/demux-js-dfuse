@@ -121,7 +121,7 @@ export class DfuseActionReader extends AbstractActionReader {
 
     if (queuedBlockNumber > blockNumber) {
       // If the first block in the queue is higher than the block we are asking, return a generic block
-      this.log.info(`Returning default block for num ${blockNumber}`)
+      // this.log.info(`Returning default block for num ${blockNumber}`)
       return getGenericBlock(blockNumber)
     } else if (queuedBlockNumber === blockNumber) {
       // If the first block in the queue is the one that was requested, return it and remove it from the queue

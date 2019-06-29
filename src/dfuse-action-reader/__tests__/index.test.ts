@@ -50,6 +50,25 @@ describe("DfuseActionReader", () => {
     expect(MockedDfuseBlockStreamer.prototype.stream).toHaveBeenCalledTimes(1)
   })
 
+  test("should initialize a DfuseBlockStreamer with the right parameters", () => {
+    const startAtBlock = 0
+    const network = "junglenet"
+
+    /* tslint:disable-next-line:no-unused-expression */
+    new DfuseActionReader({
+      startAtBlock,
+      network,
+      onlyIrreversible: false,
+      dfuseApiKey: apiKey
+    })
+
+    expect(MockedDfuseBlockStreamer).toHaveBeenCalledWith({
+      dfuseApiKey: apiKey,
+      network,
+      lowBlockNum: startAtBlock
+    })
+  })
+
   describe("#getHeadBlockNumber", () => {
     test("should wait until a first block has been returned before returning the block number", async () => {
       const actionReader = new DfuseActionReader({
