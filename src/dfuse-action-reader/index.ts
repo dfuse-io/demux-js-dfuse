@@ -5,6 +5,7 @@ import { waitUntil } from "../util"
 type DfuseActionReaderOptions = ActionReaderOptions & {
   dfuseApiKey: string
   network?: string
+  query?: string
 }
 
 function getGenericBlock(blockNumber: number = 0): Block {
@@ -60,7 +61,7 @@ export class DfuseActionReader extends AbstractActionReader {
   constructor(options: DfuseActionReaderOptions) {
     super(options)
 
-    const { dfuseApiKey, network, startAtBlock } = options
+    const { dfuseApiKey, network, startAtBlock, query } = options
 
     // Patch for an issue where dfuse doesnt return blocks 1 and 2
     if (this.startAtBlock > 0 && this.startAtBlock < 3) {
@@ -71,6 +72,7 @@ export class DfuseActionReader extends AbstractActionReader {
     this.blockStreamer = new DfuseBlockStreamer({
       dfuseApiKey,
       network,
+      query,
       lowBlockNum: startAtBlock
     })
 

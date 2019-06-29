@@ -7,6 +7,7 @@ export type DfuseBlockStreamerOptions = {
   dfuseApiKey: string
   network?: string
   lowBlockNum?: number
+  query?: string
 }
 
 // TODO find whether this type already exists in client-js or somewhere else.
@@ -46,6 +47,7 @@ type OnBlockListener = (block: Block, lastIrreversibleBlockNumber: number) => vo
 export class DfuseBlockStreamer {
   protected dfuseApiKey: string
   protected network: string
+  protected query: string
   protected apolloClient?: ApolloClient<any>
   protected listeners: OnBlockListener[] = []
   protected activeCursor: string = ""
@@ -58,11 +60,15 @@ export class DfuseBlockStreamer {
 
     this.dfuseApiKey = options.dfuseApiKey
     this.network = options.network || "mainnet"
+    this.query = options.query || "status:executed"
     this.lowBlockNum = typeof lowBlockNum !== "undefined" ? lowBlockNum : 1
   }
 
   protected getApolloClient() {
-    return getApolloClient(this.dfuseApiKey, this.network)
+    return getApolloClient({
+      apiKey: this.dfuseApiKey,
+      network: this.network
+    })
   }
 
   /**
@@ -159,15 +165,10 @@ export class DfuseBlockStreamer {
   }) {
     const { apolloClient, lowBlockNum } = options
 
-    // TODO pass SQE query from the action reader
     return apolloClient.subscribe({
       query: gql`
-        subscription($cursor: String!, $lowBlockNum: Int64) {
-          searchTransactionsForward(
-            query: "status:executed"
-            cursor: $cursor
-            lowBlockNum: $lowBlockNum
-          ) {
+        subscription($cursor: String!, $lowBlockNum: Int64!, $query: String!) {
+          searchTransactionsForward(query: $query, cursor: $cursor, lowBlockNum: $lowBlockNum) {
             undo
             irreversibleBlockNum
             trace {
@@ -193,6 +194,7 @@ export class DfuseBlockStreamer {
       `,
       variables: {
         cursor: this.activeCursor,
+        query: this.query,
         lowBlockNum
       }
     })

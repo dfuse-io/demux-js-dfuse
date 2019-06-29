@@ -53,18 +53,21 @@ describe("DfuseActionReader", () => {
   test("should initialize a DfuseBlockStreamer with the right parameters", () => {
     const startAtBlock = 0
     const network = "junglenet"
+    const query = "status:executed account:pornhashbaby"
 
     /* tslint:disable-next-line:no-unused-expression */
     new DfuseActionReader({
       startAtBlock,
       network,
       onlyIrreversible: false,
-      dfuseApiKey: apiKey
+      dfuseApiKey: apiKey,
+      query
     })
 
     expect(MockedDfuseBlockStreamer).toHaveBeenCalledWith({
       dfuseApiKey: apiKey,
       network,
+      query,
       lowBlockNum: startAtBlock
     })
   })

@@ -39,7 +39,12 @@ function getDfuseClient(apiKey: string, network: string) {
   })
 }
 
-export function getApolloClient(apiKey: string, network: string = "mainnet") {
+type getApolloClientParams = {
+  apiKey: string
+  network: string
+}
+export function getApolloClient(params: getApolloClientParams) {
+  const { apiKey, network } = params
   const dfuseClient = getDfuseClient(apiKey, network)
 
   const subscriptionClient = new SubscriptionClient(
