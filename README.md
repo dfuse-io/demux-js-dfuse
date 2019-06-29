@@ -33,7 +33,7 @@
 
 ## 🏁 Getting Started <a name = "getting_started"></a>
 
-To see a basic example, run the following command:
+To run a basic example, run the following command:
 
 `yarn run:example`
 
