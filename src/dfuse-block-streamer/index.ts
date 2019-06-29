@@ -13,7 +13,11 @@ export type DfuseBlockStreamerOptions = {
   onlyIrreversible: boolean
 }
 
-type OnBlockListener = (block: Block, lastIrreversibleBlockNumber: number) => void
+type OnBlockListener = (params: {
+  block: Block
+  lastIrreversibleBlockNumber: number
+  undo: boolean
+}) => void
 
 /**
  * DfuseBlockStreamer connects to the dfuse.io GraphQL API which transmits
@@ -210,6 +214,12 @@ export class DfuseBlockStreamer {
     this.listeners = this.listeners.filter((listener) => listener !== callback)
   }
   private notifyListeners(block: Block, lastIrreversibleBlockNumber: number): void {
-    this.listeners.forEach((listener) => listener(block, lastIrreversibleBlockNumber))
+    this.listeners.forEach((listener) =>
+      listener({
+        block,
+        lastIrreversibleBlockNumber,
+        undo: false
+      })
+    )
   }
 }

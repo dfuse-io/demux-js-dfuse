@@ -25,7 +25,11 @@ function sendBlock(
 ) {
   // TODO this code is brittle - it will fail if addOnBlockListener is called multiple times in a single test
   const onBlockCallback = MockedDfuseBlockStreamer.prototype.addOnBlockListener.mock.calls[0][0]
-  onBlockCallback.call(actionReader, block, lastIrreversibleBlockNumber)
+  onBlockCallback.call(actionReader, {
+    block,
+    lastIrreversibleBlockNumber,
+    undo: false
+  })
 }
 
 describe("DfuseActionReader", () => {

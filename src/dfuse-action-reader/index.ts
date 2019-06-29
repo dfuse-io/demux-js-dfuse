@@ -60,7 +60,9 @@ export class DfuseActionReader extends AbstractActionReader {
     this.blockStreamer.stream()
   }
 
-  private onBlock(block: Block, lastIrreversibleBlockNumber: number) {
+  private onBlock(params: { block: Block; lastIrreversibleBlockNumber: number; undo: boolean }) {
+    const { block, lastIrreversibleBlockNumber, undo } = params
+
     /*
      * When we are seeing a new block, we need to update our head reference
      * Math.max is used in case an "undo" trx is returned, with a lower block
