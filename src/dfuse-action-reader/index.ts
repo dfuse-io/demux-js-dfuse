@@ -66,7 +66,9 @@ export class DfuseActionReader extends AbstractActionReader {
     /*
      * When we are seeing a new block, we need to update our head reference
      * Math.max is used in case an "undo" trx is returned, with a lower block
-     * number than our head reference.
+     * number than our head reference. If there was a fork, the head block
+     * must be higher than the head block we have previously seen due to the
+     * longest chain prevailing in case of a fork
      */
     this.headBlockNumber = Math.max(this.headBlockNumber, block.blockInfo.blockNumber)
 
@@ -97,14 +99,14 @@ export class DfuseActionReader extends AbstractActionReader {
     // If the queue is empty, wait for apollo to return new results.
     await waitUntil(() => this.blockQueue.length > 0)
 
-    const queuedBlock = this.blockQueue[0]
-    const queuedBlockNumber = queuedBlock.blockInfo.blockNumber
+    const firstBlock = this.blockQueue[0]
+    const firstBlockNumber = firstBlock.blockInfo.blockNumber
 
-    if (queuedBlockNumber > blockNumber) {
+    if (firstBlockNumber > blockNumber) {
       // If the first block in the queue is higher than the block we are asking, return a generic block
       // this.log.info(`Returning default block for num ${blockNumber}`)
       return getGenericBlock(blockNumber)
-    } else if (queuedBlockNumber === blockNumber) {
+    } else if (firstBlockNumber === blockNumber) {
       // If the first block in the queue is the one that was requested, return it and remove it from the queue
       this.blockQueue.shift()
 
@@ -112,9 +114,9 @@ export class DfuseActionReader extends AbstractActionReader {
       // if the previous block wasnt returned by dfuse and we had to return a generic block
       // todo is there a better solution than this?
       if (this.currentBlockData.blockInfo.blockHash === "") {
-        queuedBlock.blockInfo.previousBlockHash = ""
+        firstBlock.blockInfo.previousBlockHash = ""
       }
-      return queuedBlock
+      return firstBlock
     } else {
       // todo clean this up. this should be handled more gracefully.
       const queuedBlockNumbers = this.blockQueue.map((x) => x.blockInfo.blockNumber)
