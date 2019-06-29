@@ -16,7 +16,7 @@
 
 ---
 
-<p align="center"> Demux-js Action Reader Implementation  for dfuse.io
+<p align="center">A demux-js Action Reader Implementation  for dfuse.io
     <br> 
 </p>
 
@@ -39,9 +39,31 @@ To see a basic example, run the following command:
 
 The code for the example can be found in the `/example` directory at the root of the project.
 
-## 🎈 Usage <a name="usage"></a>
+## 🛫 Usage <a name="usage"></a>
 
-Add notes about how to use the system.
+To use dfuse as your data source, simply pass a DfuseActionReader instance to a Demux ActionWatcher.
+
+You will need to create your own ActionHandler. For more information on this, [visit the demux-js repository](https://github.com/EOSIO/demux-js).
+
+To generate a dfuse API key, visit [the dfuse website](https://www.dfuse.io).
+
+```
+import { BaseActionWatcher } from "demux"
+import { ObjectActionHandler } from "./ObjectActionHandler"
+import { handlerVersion } from "./handlerVersions/v1"
+import { DfuseActionReader } from "demux-js-dfuse"
+
+const actionHandler = new ObjectActionHandler([handlerVersion])
+
+const dfuseActionReader = new DfuseActionReader({
+  startAtBlock: 1,
+  onlyIrreversible: false,
+  dfuseApiKey: "YOUR DFUSE API KEY"
+})
+
+const actionWatcher = new BaseActionWatcher(dfuseActionReader, actionHandler, 100)
+actionWatcher.watch()
+```
 
 ## 🔧 Running the tests <a name = "tests"></a>
 
