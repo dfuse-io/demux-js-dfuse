@@ -39,6 +39,7 @@ describe("DfuseActionReader", () => {
   })
 
   test("should start streaming blocks as soon as it is instantiated", () => {
+    /* tslint:disable-next-line:no-unused-expression */
     new DfuseActionReader({
       startAtBlock: 0,
       onlyIrreversible: false,
