@@ -143,7 +143,7 @@ export class DfuseBlockStreamer {
   }
 
   /**
-   * Creates an apollo observable query and returns it
+   * Creates and returns an Apollo observable query
    */
   private getObservableSubscription(options: {
     apolloClient: ApolloClient<any>
