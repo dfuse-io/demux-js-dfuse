@@ -1,3 +1,4 @@
+import * as Logger from "bunyan"
 import { Block } from "demux"
 import { getApolloClient } from "../util"
 import ApolloClient from "apollo-client/ApolloClient"
@@ -22,6 +23,7 @@ type OnBlockListener = (block: Block, lastIrreversibleBlockNumber: number) => vo
  * to listeners via a PubSub pattern it implements.
  */
 export class DfuseBlockStreamer {
+  protected log: Logger
   protected dfuseApiKey: string
   protected network: string
   protected query: string
@@ -36,14 +38,25 @@ export class DfuseBlockStreamer {
   constructor(options: DfuseBlockStreamerOptions) {
     const { lowBlockNum, onlyIrreversible } = options
 
+    this.log = Logger.createLogger({ name: "demux-dfuse" })
     this.lowBlockNum = typeof lowBlockNum !== "undefined" ? lowBlockNum : 1
     this.dfuseApiKey = options.dfuseApiKey
     this.network = options.network || "mainnet"
     this.query = options.query || "status:executed"
     this.onlyIrreversible = typeof onlyIrreversible !== "undefined" ? onlyIrreversible : false
+
+    this.log.trace("DfuseBlockStreamer", {
+      lowBlockNum: this.lowBlockNum,
+      hasDfuseApiKey: !!options.dfuseApiKey,
+      network: this.network,
+      query: this.query,
+      onlyIrreversible: this.onlyIrreversible
+    })
   }
 
   protected getApolloClient() {
+    this.log.trace("DfuseBlockStreamer.getApolloClient()")
+
     return getApolloClient({
       apiKey: this.dfuseApiKey,
       network: this.network
@@ -55,30 +68,30 @@ export class DfuseBlockStreamer {
    * registered listeners every time a new block is completed
    */
   public stream() {
+    this.log.trace("DfuseBlockStreamer.stream()")
+
     if (!this.apolloClient) {
       this.apolloClient = this.getApolloClient()
     }
 
-    const subscription = this.getObservableSubscription({
+    this.getObservableSubscription({
       apolloClient: this.apolloClient!,
       lowBlockNum: this.lowBlockNum
-    })
-
-    subscription.subscribe({
-      // start: (subscription) => {
-      //   console.log("Started", subscription)
-      // },
+    }).subscribe({
+      start: () => {
+        this.log.trace("DfuseBlockStreamer GraphQL subscription started")
+      },
       next: (value) => {
         this.onTransactionReceived(value.data.searchTransactionsForward)
+      },
+      error: (error) => {
+        // TODO should we be doing anything else?
+        this.log.error("DfuseBlockStreamer GraphQL subscription error", error)
+      },
+      complete: () => {
+        // TODO: how to handle completion? Will we ever reach completion?
+        this.log.error("DfuseBlockStreamer GraphQL subscription completed")
       }
-      // error: (error) => {
-      //   // TODO: how to handle subscription errors? Invalid queries?
-      //   console.log("Error", error)
-      // },
-      // complete: () => {
-      //   // TODO: how to handle completion? Will we ever reach completion?
-      //   console.log("Completed")
-      // }
     })
   }
 
@@ -88,7 +101,7 @@ export class DfuseBlockStreamer {
 
     // todo figure out how to handle undos
     if (undo) {
-      console.log("undo", undo)
+      this.log.info("Undo found in the wild", transaction)
     }
 
     const isFirstProcessed = this.currentBlockNumber === -1

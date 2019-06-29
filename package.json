@@ -60,6 +60,7 @@
     ]
   },
   "devDependencies": {
+    "@types/bunyan": "^1.8.6",
     "@types/dotenv": "^6.1.1",
     "@types/jest": "^23.3.9",
     "@types/node-fetch": "^2.1.6",
