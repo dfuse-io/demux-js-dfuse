@@ -8,36 +8,6 @@ type DfuseActionReaderOptions = ActionReaderOptions & {
   query?: string
 }
 
-function getGenericBlock(blockNumber: number = 0): Block {
-  return {
-    blockInfo: {
-      blockNumber,
-      blockHash: "",
-      previousBlockHash: "",
-      timestamp: new Date(0)
-    },
-    actions: []
-  }
-}
-const block1: Block = {
-  blockInfo: {
-    blockNumber: 1,
-    blockHash: "00000001405147477ab2f5f51cda427b638191c66d2c59aa392d5c2c98076cb0",
-    previousBlockHash: "",
-    timestamp: new Date("2018-06-08T08:08:08.000Z")
-  },
-  actions: []
-}
-const block2: Block = {
-  blockInfo: {
-    blockNumber: 2,
-    blockHash: "0000000267f3e2284b482f3afc2e724be1d6cbc1804532ec62d4e7af47c30693",
-    previousBlockHash: "00000001405147477ab2f5f51cda427b638191c66d2c59aa392d5c2c98076cb0",
-    timestamp: new Date("2018-06-08T08:08:08.000Z")
-  },
-  actions: []
-}
-
 /**
  * Implements a demux-js ActionReader (see https://github.com/EOSIO/demux-js for more information).
  *
@@ -163,4 +133,34 @@ export class DfuseActionReader extends AbstractActionReader {
   protected async setup(): Promise<void> {
     return
   }
+}
+
+function getGenericBlock(blockNumber: number = 0): Block {
+  return {
+    blockInfo: {
+      blockNumber,
+      blockHash: "",
+      previousBlockHash: "",
+      timestamp: new Date(0)
+    },
+    actions: []
+  }
+}
+const block1: Block = {
+  blockInfo: {
+    blockNumber: 1,
+    blockHash: "00000001405147477ab2f5f51cda427b638191c66d2c59aa392d5c2c98076cb0",
+    previousBlockHash: "",
+    timestamp: new Date("2018-06-08T08:08:08.000Z")
+  },
+  actions: []
+}
+const block2: Block = {
+  blockInfo: {
+    blockNumber: 2,
+    blockHash: "0000000267f3e2284b482f3afc2e724be1d6cbc1804532ec62d4e7af47c30693",
+    previousBlockHash: "00000001405147477ab2f5f51cda427b638191c66d2c59aa392d5c2c98076cb0",
+    timestamp: new Date("2018-06-08T08:08:08.000Z")
+  },
+  actions: []
 }

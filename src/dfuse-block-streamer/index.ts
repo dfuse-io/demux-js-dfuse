@@ -2,37 +2,13 @@ import { Block } from "demux"
 import { getApolloClient } from "../util"
 import ApolloClient from "apollo-client/ApolloClient"
 import { gql } from "apollo-boost"
+import { Transaction } from "../types"
 
 export type DfuseBlockStreamerOptions = {
   dfuseApiKey: string
   network?: string
   lowBlockNum?: number
   query?: string
-}
-
-// TODO find whether this type already exists in client-js or somewhere else.
-export type Transaction = {
-  undo: boolean
-  irreversibleBlockNum: number
-  cursor: string
-  trace: {
-    id: string
-    matchingActions: {
-      account: string
-      name: string
-      data: {}
-      authorization: {
-        actor: string
-        permission: string
-      }[]
-    }[]
-    block: {
-      num: number
-      id: string
-      previous: string
-      timestamp: Date
-    }
-  }
 }
 
 type OnBlockListener = (block: Block, lastIrreversibleBlockNumber: number) => void
