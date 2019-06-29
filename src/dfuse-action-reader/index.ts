@@ -1,21 +1,22 @@
 import { AbstractActionReader, ActionReaderOptions, Block } from "demux"
-import { gql } from "apollo-boost"
-import { getApolloClient, waitUntil } from "../util"
 import { DfuseBlockStreamer } from "../dfuse-block-streamer"
+import { waitUntil } from "../util"
 
 type DfuseActionReaderOptions = ActionReaderOptions & {
   dfuseApiKey: string
   network?: string
 }
 
-const defaultBlock: Block = {
-  blockInfo: {
-    blockNumber: 0,
-    blockHash: "",
-    previousBlockHash: "",
-    timestamp: new Date(0)
-  },
-  actions: []
+function getGenericBlock(blockNumber: number = 0): Block {
+  return {
+    blockInfo: {
+      blockNumber,
+      blockHash: "",
+      previousBlockHash: "",
+      timestamp: new Date(0)
+    },
+    actions: []
+  }
 }
 const block1: Block = {
   blockInfo: {
@@ -63,6 +64,11 @@ export class DfuseActionReader extends AbstractActionReader {
     this.streamBlocks()
   }
 
+  private async streamBlocks(): Promise<void> {
+    this.blockStreamer.addOnBlockListener(this.onBlock)
+    this.blockStreamer.stream()
+  }
+
   private onBlock(block: Block, lastIrreversibleBlockNumber: number) {
     /*
      * When we are seeing a new block, we need to update our head reference
@@ -84,15 +90,6 @@ export class DfuseActionReader extends AbstractActionReader {
     this.blockQueue.push(block)
   }
 
-  private async streamBlocks(): Promise<void> {
-    this.blockStreamer.addOnBlockListener(this.onBlock)
-    this.blockStreamer.stream()
-  }
-
-  protected async setup(): Promise<void> {
-    return
-  }
-
   public async getBlock(blockNumber: number): Promise<Block> {
     // Patch around the issues caused by Dfuse not returning anything for blocks 1 and 2
     if (blockNumber === 1) {
@@ -111,13 +108,13 @@ export class DfuseActionReader extends AbstractActionReader {
     if (queuedBlockNumber > blockNumber) {
       // If the first block in the queue is higher than the block we are asking, return a generic block
       this.log.info(`Returning default block for num ${blockNumber}`)
-      return defaultBlock
+      return getGenericBlock(blockNumber)
     } else if (queuedBlockNumber === blockNumber) {
       // If the first block in the queue is the one that was requested, return it and remove it from the queue
       this.blockQueue.shift()
 
       // Hack to make the block's previousHash property match the previous block,
-      // if the previous block wasnt returned by dfuse and we had to return a default block
+      // if the previous block wasnt returned by dfuse and we had to return a generic block
       // todo is there a better solution than this?
       if (this.currentBlockData.blockInfo.blockHash === "") {
         queuedBlock.blockInfo.previousBlockHash = ""
@@ -144,6 +141,10 @@ export class DfuseActionReader extends AbstractActionReader {
 
   // todo do we need to resolve forks, or is dfuse handling all of this for us?
   protected async resolveFork() {
+    return
+  }
+
+  protected async setup(): Promise<void> {
     return
   }
 }

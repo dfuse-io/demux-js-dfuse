@@ -20,12 +20,17 @@ function getTransactionStub(blockNumber: number = 3): Transaction {
 
 describe("DfuseBlockStreamer", () => {
   let blockStreamer: DfuseBlockStreamer
+  let blockStreamerSpy: jest.SpyInstance
 
   beforeEach(() => {
     blockStreamer = new DfuseBlockStreamer({ dfuseApiKey: "web_0123456789acdef" })
 
     // Mock the stream method to prevent the apollo client from instantiating
-    jest.spyOn(blockStreamer, "stream").mockImplementation(() => null)
+    blockStreamerSpy = jest.spyOn(blockStreamer, "stream").mockImplementation(() => null)
+  })
+
+  afterEach(() => {
+    blockStreamerSpy.mockRestore()
   })
 
   test("should not notify registered listeners until a new block is completely received", () => {

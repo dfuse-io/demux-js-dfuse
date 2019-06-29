@@ -53,7 +53,7 @@ export class DfuseBlockStreamer {
     this.lowBlockNum = typeof lowBlockNum !== "undefined" ? lowBlockNum : 1
   }
 
-  private getApolloClient() {
+  protected getApolloClient() {
     return getApolloClient(this.dfuseApiKey, this.network)
   }
 
