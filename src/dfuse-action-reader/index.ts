@@ -21,6 +21,10 @@ type DfuseActionReaderOptions = ActionReaderOptions & {
  * next block in the chain.
  *
  * Since we only actually fetch the blocks that interest us, we can see great performance gains.
+ *
+ * demux-js also expects blocks to be fetched one by one, making one network request per block. With dfuse,
+ * this is is not necessary, since we can stream only the blocks we want via the graphl api. To circumvent this
+ * expectation, the streamed blocks will be put in a FIFO queue, where demux can find them.
  */
 export class DfuseActionReader extends AbstractActionReader {
   protected headInfoInitialized: boolean = false
