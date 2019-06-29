@@ -123,7 +123,7 @@ export class DfuseBlockStreamer {
       this.notifyListeners(this.currentBlock!, irreversibleBlockNum)
     }
 
-    // Create a new block object
+    // Create a new current block if necessary
     if (isNewBlock) {
       this.currentBlockNumber = transaction.trace.block.num
       this.currentBlock = {
@@ -137,7 +137,7 @@ export class DfuseBlockStreamer {
       }
     }
 
-    // Insert matching actions into the right block
+    // Insert matching actions into the current block
     matchingActions.forEach((action: any) => {
       this.currentBlock!.actions.push({
         type: `${action.account}::${action.name}`,
