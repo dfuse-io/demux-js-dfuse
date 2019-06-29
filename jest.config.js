@@ -1,9 +1,9 @@
 const { defaults } = require("jest-config")
 
 module.exports = {
-  // transform: {
-  //   "^.+\\.tsx?$": "ts-jest"
-  // },
+  transform: {
+    "^.+\\.tsx?$": "ts-jest"
+  },
   testEnvironment: "jsdom",
   setupFilesAfterEnv: ["jest-expect-message"],
   clearMocks: true,
