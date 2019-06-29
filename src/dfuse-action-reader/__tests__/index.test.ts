@@ -12,4 +12,6 @@ function getBlockStub(blockNumber: number = 1): Block {
   }
 }
 
-describe("DfuseActionReader", () => {})
+describe("DfuseActionReader", () => {
+  return
+})
