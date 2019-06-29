@@ -41,8 +41,8 @@ const actionHandler = new ObjectActionHandler([handlerVersion])
 const dfuseActionReader = new DfuseActionReader({
   startAtBlock: 0, // default is 1, which means start at genesis block
   onlyIrreversible: false,
-  dfuseApiKey: process.env.DFUSE_API_KEY as string,
-  query: "status:executed account:pornhashbaby" // default is "status:executed"
+  dfuseApiKey: process.env.DFUSE_API_KEY as string
+  // query: "status:executed" // Any dfuse SQE query, default is "status:executed"
   // network: "mainnet" // Default is "mainnet"
 })
 

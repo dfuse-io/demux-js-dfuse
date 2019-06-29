@@ -54,12 +54,13 @@ describe("DfuseActionReader", () => {
     const startAtBlock = 0
     const network = "junglenet"
     const query = "status:executed account:pornhashbaby"
+    const onlyIrreversible = false
 
     /* tslint:disable-next-line:no-unused-expression */
     new DfuseActionReader({
       startAtBlock,
       network,
-      onlyIrreversible: false,
+      onlyIrreversible,
       dfuseApiKey: apiKey,
       query
     })
@@ -68,6 +69,7 @@ describe("DfuseActionReader", () => {
       dfuseApiKey: apiKey,
       network,
       query,
+      onlyIrreversible,
       lowBlockNum: startAtBlock
     })
   })

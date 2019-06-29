@@ -24,7 +24,10 @@ describe("DfuseBlockStreamer", () => {
   let blockStreamerSpy: jest.SpyInstance
 
   beforeEach(() => {
-    blockStreamer = new DfuseBlockStreamer({ dfuseApiKey: "web_0123456789acdef" })
+    blockStreamer = new DfuseBlockStreamer({
+      dfuseApiKey: "web_0123456789acdef",
+      onlyIrreversible: false
+    })
 
     // Mock the stream method to prevent the apollo client from instantiating
     blockStreamerSpy = jest.spyOn(blockStreamer, "stream").mockImplementation(() => null)

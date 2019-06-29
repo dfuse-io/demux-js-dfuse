@@ -9,6 +9,7 @@ export type DfuseBlockStreamerOptions = {
   network?: string
   lowBlockNum?: number
   query?: string
+  onlyIrreversible: boolean
 }
 
 type OnBlockListener = (block: Block, lastIrreversibleBlockNumber: number) => void
@@ -30,14 +31,16 @@ export class DfuseBlockStreamer {
   protected lowBlockNum: number
   protected currentBlockNumber: number = -1
   protected currentBlock?: Block
+  protected onlyIrreversible: boolean
 
   constructor(options: DfuseBlockStreamerOptions) {
-    const { lowBlockNum } = options
+    const { lowBlockNum, onlyIrreversible } = options
 
+    this.lowBlockNum = typeof lowBlockNum !== "undefined" ? lowBlockNum : 1
     this.dfuseApiKey = options.dfuseApiKey
     this.network = options.network || "mainnet"
     this.query = options.query || "status:executed"
-    this.lowBlockNum = typeof lowBlockNum !== "undefined" ? lowBlockNum : 1
+    this.onlyIrreversible = typeof onlyIrreversible !== "undefined" ? onlyIrreversible : false
   }
 
   protected getApolloClient() {
@@ -143,8 +146,18 @@ export class DfuseBlockStreamer {
 
     return apolloClient.subscribe({
       query: gql`
-        subscription($cursor: String!, $lowBlockNum: Int64!, $query: String!) {
-          searchTransactionsForward(query: $query, cursor: $cursor, lowBlockNum: $lowBlockNum) {
+        subscription(
+          $cursor: String!
+          $lowBlockNum: Int64!
+          $query: String!
+          $onlyIrreversible: Boolean!
+        ) {
+          searchTransactionsForward(
+            query: $query
+            cursor: $cursor
+            lowBlockNum: $lowBlockNum
+            irreversibleOnly: $onlyIrreversible
+          ) {
             undo
             irreversibleBlockNum
             trace {
@@ -171,6 +184,7 @@ export class DfuseBlockStreamer {
       variables: {
         cursor: this.activeCursor,
         query: this.query,
+        onlyIrreversible: this.onlyIrreversible,
         lowBlockNum
       }
     })

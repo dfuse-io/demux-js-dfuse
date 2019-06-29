@@ -43,6 +43,7 @@ export class DfuseActionReader extends AbstractActionReader {
       dfuseApiKey,
       network,
       query,
+      onlyIrreversible: this.onlyIrreversible,
       lowBlockNum: startAtBlock
     })
 
@@ -77,6 +78,8 @@ export class DfuseActionReader extends AbstractActionReader {
   }
 
   public async getBlock(blockNumber: number): Promise<Block> {
+    // console.log("getBlock", blockNumber, this.blockQueue.length)
+
     // Patch around the issues caused by Dfuse not returning anything for blocks 1 and 2
     if (blockNumber === 1) {
       return block1
