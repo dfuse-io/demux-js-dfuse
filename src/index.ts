@@ -1,1 +1,1 @@
-export * from "./dfuse-action-watcher"
+export * from "./dfuse-action-reader"

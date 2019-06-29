@@ -37,6 +37,20 @@ const block2: Block = {
   actions: []
 }
 
+/**
+ * Implements a demux-js ActionReader (see https://github.com/EOSIO/demux-js for more information).
+ *
+ * Demux-js makes the assumption that all blocks need to be read. This would be true if reading directly
+ * from an eos node, but it is not the case when using dfuse. Based on the provided query, dfuse will
+ * return only the transactions that match the query. This means that blocks that don't interest us will
+ * be missing.
+ *
+ * Because demux-js needs to see every block one by one, when a block that didn't match the dfuse query is
+ * required, we return a dummy GenericBlock that contains no actions to get demux-js to move forward to the
+ * next block in the chain.
+ *
+ * Since we only actually fetch the blocks that interest us, we can see great performance gains.
+ */
 export class DfuseActionReader extends AbstractActionReader {
   protected headInfoInitialized: boolean = false
   protected activeCursor: string = ""

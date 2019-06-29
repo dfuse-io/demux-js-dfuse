@@ -9,6 +9,7 @@ export type DfuseBlockStreamerOptions = {
   lowBlockNum?: number
 }
 
+// TODO find whether this type already exists in client-js or somewhere else.
 export type Transaction = {
   undo: boolean
   irreversibleBlockNum: number
@@ -35,6 +36,13 @@ export type Transaction = {
 
 type OnBlockListener = (block: Block, lastIrreversibleBlockNumber: number) => void
 
+/**
+ * DfuseBlockStreamer connects to the dfuse.io GraphQL API which transmits
+ * the transactions that match a query written in SQE (see http://docs.dfuse.io for more information).
+ *
+ * As it receives transactions, it will group them by block, and send the reconstructed blocks
+ * to listeners via a PubSub pattern it implements.
+ */
 export class DfuseBlockStreamer {
   protected dfuseApiKey: string
   protected network: string
