@@ -47,7 +47,7 @@ You will need to create your own ActionHandler. For more information on this, [v
 
 To generate a dfuse API key, visit [the dfuse website](https://www.dfuse.io).
 
-```
+```js
 import { BaseActionWatcher } from "demux"
 import { ObjectActionHandler } from "./ObjectActionHandler"
 import { handlerVersion } from "./handlerVersions/v1"
