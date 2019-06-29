@@ -1,4 +1,5 @@
-import { DfuseBlockStreamer, Transaction } from ".."
+import { DfuseBlockStreamer } from ".."
+import { Transaction } from "../.."
 
 function getTransactionStub(blockNumber: number = 3): Transaction {
   return {
