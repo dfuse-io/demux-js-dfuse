@@ -40,7 +40,7 @@
     "lint:specific": "tslint",
     "start": "tsc --module commonjs --watch",
     "run:example": "node --inspect -r ts-node/register example/index.ts",
-    "test": "jest"
+    "test": "jest --coverage"
   },
   "husky": {
     "hooks": {

@@ -1,15 +1,12 @@
 const { defaults } = require("jest-config")
 
 module.exports = {
-  moduleDirectories: ["<rootDir>/node_modules"],
-  moduleFileExtensions: [...defaults.moduleFileExtensions, "ts", "tsx"],
-  moduleNameMapper: {},
-  transform: {
-    "^.+\\.tsx?$": "ts-jest"
-  },
+  // transform: {
+  //   "^.+\\.tsx?$": "ts-jest"
+  // },
   testEnvironment: "jsdom",
-  testRegex: "((\\.|/)(test|spec))\\.(jsx?|tsx?)$",
-  setupFilesAfterEnv: ["jest-expect-message"]
+  setupFilesAfterEnv: ["jest-expect-message"],
+  clearMocks: true,
 
   // coverageThreshold: {
   //   global: {
@@ -19,6 +16,7 @@ module.exports = {
   //     statements: 62.0
   //   }
   // },
-  // collectCoverage: true,
-  // coverageReporters: ["json", "html"]
+  collectCoverage: true,
+  // coverageReporters: ["json", "html"],
+  coverageDirectory: "coverage"
 }
