@@ -99,19 +99,14 @@ export class DfuseBlockStreamer {
     const { undo, trace, irreversibleBlockNum } = transaction
     const { matchingActions, block } = trace
 
-    // todo figure out how to handle undos
-    if (undo) {
-      this.log.info("Undo found in the wild", transaction)
-    }
-
-    const isFirstProcessed = this.currentBlockNumber === -1
+    const isEarliestBlock = this.currentBlockNumber === -1
     const isNewBlock = block.num !== this.currentBlockNumber
 
     /*
      * When we see a transaction belonging to a different block than
      * the previous one, we pushed the previous block into the queue
      */
-    if (!isFirstProcessed && isNewBlock) {
+    if (!isEarliestBlock && isNewBlock) {
       this.notifyListeners(this.currentBlock!)
     }
 
@@ -129,9 +124,9 @@ export class DfuseBlockStreamer {
           }
         },
         blockMeta: {
-          isRollback: false,
-          isNewBlock: false,
-          isEarliestBlock: false
+          isRollback: undo,
+          isNewBlock: true,
+          isEarliestBlock
         },
         lastIrreversibleBlockNumber: irreversibleBlockNum
       }

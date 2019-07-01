@@ -1,4 +1,4 @@
-import { AbstractActionReader, ActionReaderOptions, Block, NextBlock, BlockMeta } from "demux"
+import { AbstractActionReader, ActionReaderOptions, Block, NextBlock } from "demux"
 import { DfuseBlockStreamer } from "../dfuse-block-streamer"
 import { waitUntil } from "../util"
 
@@ -84,8 +84,6 @@ export class DfuseActionReader extends AbstractActionReader {
   }
 
   public async getBlock(blockNumber: number): Promise<Block> {
-    // console.log("getBlock", blockNumber, this.blockQueue.length)
-
     // Patch around the issues caused by Dfuse not returning anything for blocks 1 and 2
     if (blockNumber === 1) {
       return block1
@@ -125,55 +123,25 @@ export class DfuseActionReader extends AbstractActionReader {
   }
 
   public async getNextBlock(): Promise<NextBlock> {
-    const blockMeta: BlockMeta = {
-      isRollback: false,
-      isNewBlock: false,
-      isEarliestBlock: false
-    }
-
-    this.lastIrreversibleBlockNumber = await this.getLastIrreversibleBlockNumber()
-
     if (!this.initialized) {
       await this.initialize()
     }
 
-    if (this.currentBlockNumber === this.headBlockNumber) {
-      this.headBlockNumber = await (this as any).getLatestNeededBlockNumber()
-    }
+    // If the queue is empty, wait for apollo to return new results.
+    await waitUntil(() => this.blockQueue.length > 0)
+
+    const nextBlock = this.blockQueue.shift()
 
     if (this.currentBlockNumber < this.headBlockNumber) {
-      // If the queue is empty, wait for apollo to return new results.
-      await waitUntil(() => this.blockQueue.length > 0)
-
-      const unvalidatedBlockData = await this.getBlock(
-        this.blockQueue[0].block.blockInfo.blockNumber
-      )
-
-      const expectedHash = this.currentBlockData.blockInfo.blockHash
-      const actualHash = this.currentBlockNumber
-        ? unvalidatedBlockData.blockInfo.previousBlockHash
-        : defaultBlock.blockInfo.blockHash
-
-      if (expectedHash === actualHash) {
-        ;(this as any).acceptBlock(unvalidatedBlockData)
-        blockMeta.isNewBlock = true
+      if (nextBlock!.blockMeta.isRollback === false) {
+        ;(this as any).acceptBlock(nextBlock!.block)
       } else {
-        ;(this as any).logForkDetected(unvalidatedBlockData, expectedHash, actualHash)
+        // console.log("FORK!!!")
         await this.resolveFork()
-        blockMeta.isNewBlock = true
-        blockMeta.isRollback = true
-        // Reset for safety, as new fork could have less blocks than the previous fork
-        this.headBlockNumber = await (this as any).getLatestNeededBlockNumber()
       }
     }
 
-    blockMeta.isEarliestBlock = this.currentBlockNumber === this.startAtBlock
-
-    return {
-      block: this.currentBlockData,
-      blockMeta,
-      lastIrreversibleBlockNumber: this.lastIrreversibleBlockNumber
-    }
+    return nextBlock!
   }
 
   public async getHeadBlockNumber(): Promise<number> {
@@ -185,11 +153,6 @@ export class DfuseActionReader extends AbstractActionReader {
     await waitUntil(() => this.lastIrreversibleBlockNumber !== 0)
     return this.lastIrreversibleBlockNumber
   }
-
-  // todo do we need to resolve forks, or is dfuse handling all of this for us?
-  // protected async resolveFork() {
-  //   return
-  // }
 
   protected async setup(): Promise<void> {
     return

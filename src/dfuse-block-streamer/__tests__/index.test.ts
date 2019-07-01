@@ -26,7 +26,8 @@ describe("DfuseBlockStreamer", () => {
   beforeEach(() => {
     blockStreamer = new DfuseBlockStreamer({
       dfuseApiKey: "web_0123456789acdef",
-      onlyIrreversible: false
+      onlyIrreversible: false,
+      lowBlockNum: 3
     })
 
     // Mock the stream method to prevent the apollo client from instantiating
@@ -78,5 +79,28 @@ describe("DfuseBlockStreamer", () => {
 
     expect(stub1).toHaveBeenCalledTimes(1)
     expect(stub2).toHaveBeenCalledTimes(1)
+  })
+
+  test("should allow multiple listeners to be registered and notified", () => {
+    const stub1 = jest.fn()
+    const stub2 = jest.fn()
+    blockStreamer.addOnBlockListener(stub1)
+    blockStreamer.addOnBlockListener(stub2)
+
+    // Send a full block
+    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(3))
+    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(4))
+
+    expect(stub1).toHaveBeenCalledTimes(1)
+    expect(stub2).toHaveBeenCalledTimes(1)
+  })
+
+  test("should should return a block with the property isEarliestBlock set to true for the first block, even if it is higher than lowBlockNum", () => {
+    const stub = jest.fn()
+    blockStreamer.addOnBlockListener(stub)
+    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(5))
+    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(6))
+
+    expect(stub.mock.calls[0][0].blockMeta.isEarliestBlock).toEqual(true)
   })
 })
