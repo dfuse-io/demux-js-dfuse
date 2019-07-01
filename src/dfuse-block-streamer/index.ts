@@ -1,5 +1,5 @@
 import * as Logger from "bunyan"
-import { Block } from "demux"
+import { NextBlock } from "demux"
 import { getApolloClient } from "../util"
 import ApolloClient from "apollo-client/ApolloClient"
 import { gql } from "apollo-boost"
@@ -13,11 +13,7 @@ export type DfuseBlockStreamerOptions = {
   onlyIrreversible: boolean
 }
 
-type OnBlockListener = (params: {
-  block: Block
-  lastIrreversibleBlockNumber: number
-  undo: boolean
-}) => void
+type OnBlockListener = (nextBlock: NextBlock) => void
 
 /**
  * DfuseBlockStreamer connects to the dfuse.io GraphQL API which transmits
@@ -36,7 +32,7 @@ export class DfuseBlockStreamer {
   protected activeCursor: string = ""
   protected lowBlockNum: number
   protected currentBlockNumber: number = -1
-  protected currentBlock?: Block
+  protected currentBlock?: NextBlock
   protected onlyIrreversible: boolean
 
   constructor(options: DfuseBlockStreamerOptions) {
@@ -103,39 +99,44 @@ export class DfuseBlockStreamer {
     const { undo, trace, irreversibleBlockNum } = transaction
     const { matchingActions, block } = trace
 
-    // todo figure out how to handle undos
-    if (undo) {
-      this.log.info("Undo found in the wild", transaction)
-    }
-
-    const isFirstProcessed = this.currentBlockNumber === -1
-    const isNewBlock = block.num !== this.currentBlockNumber
+    const isEarliestBlock = this.currentBlockNumber === -1
+    const isNewBlock =
+      block.num !== this.currentBlockNumber ||
+      (this.currentBlock && this.currentBlock.blockMeta.isRollback !== undo)
 
     /*
      * When we see a transaction belonging to a different block than
      * the previous one, we pushed the previous block into the queue
      */
-    if (!isFirstProcessed && isNewBlock) {
-      this.notifyListeners(this.currentBlock!, irreversibleBlockNum)
+    if (!isEarliestBlock && isNewBlock) {
+      this.notifyListeners(this.currentBlock!)
     }
 
     // Create a new current block if necessary
     if (isNewBlock) {
       this.currentBlockNumber = transaction.trace.block.num
       this.currentBlock = {
-        actions: [],
-        blockInfo: {
-          blockNumber: block.num,
-          blockHash: block.id,
-          previousBlockHash: block.previous,
-          timestamp: block.timestamp
-        }
+        block: {
+          actions: [],
+          blockInfo: {
+            blockNumber: block.num,
+            blockHash: block.id,
+            previousBlockHash: block.previous,
+            timestamp: block.timestamp
+          }
+        },
+        blockMeta: {
+          isRollback: undo,
+          isNewBlock: true,
+          isEarliestBlock
+        },
+        lastIrreversibleBlockNumber: irreversibleBlockNum
       }
     }
 
     // Insert matching actions into the current block
     matchingActions.forEach((action: any) => {
-      this.currentBlock!.actions.push({
+      this.currentBlock!.block.actions.push({
         type: `${action.account}::${action.name}`,
         payload: {
           transactionId: trace.id,
@@ -213,13 +214,7 @@ export class DfuseBlockStreamer {
   public removeOnBlockListener(callback: OnBlockListener): void {
     this.listeners = this.listeners.filter((listener) => listener !== callback)
   }
-  private notifyListeners(block: Block, lastIrreversibleBlockNumber: number): void {
-    this.listeners.forEach((listener) =>
-      listener({
-        block,
-        lastIrreversibleBlockNumber,
-        undo: false
-      })
-    )
+  private notifyListeners(nextBlock: NextBlock): void {
+    this.listeners.forEach((listener) => listener(nextBlock))
   }
 }
