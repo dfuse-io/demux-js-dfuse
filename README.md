@@ -7,7 +7,7 @@
 
 <div align="center">
 
-[![Status](https://img.shields.io/badge/status-develop-success.svg)]()
+[![Status](https://img.shields.io/badge/status-alpha-blue.svg)]()
 [![GitHub Issues](https://img.shields.io/github/issues/dfuse-io/demux-js-dfuse.svg)](https://github.com/dfuse-io/demux-js-dfuse/issues)
 [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/dfuse-io/demux-js-dfuse.svg)](https://github.com/dfuse-io/demux-js-dfuse/pulls)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](/LICENSE)
