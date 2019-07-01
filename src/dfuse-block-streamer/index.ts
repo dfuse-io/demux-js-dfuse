@@ -100,7 +100,9 @@ export class DfuseBlockStreamer {
     const { matchingActions, block } = trace
 
     const isEarliestBlock = this.currentBlockNumber === -1
-    const isNewBlock = block.num !== this.currentBlockNumber
+    const isNewBlock =
+      block.num !== this.currentBlockNumber ||
+      (this.currentBlock && this.currentBlock.blockMeta.isRollback !== undo)
 
     /*
      * When we see a transaction belonging to a different block than

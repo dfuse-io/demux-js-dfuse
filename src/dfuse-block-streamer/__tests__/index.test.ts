@@ -1,9 +1,9 @@
 import { DfuseBlockStreamer } from ".."
 import { Transaction } from "../.."
 
-function getTransactionStub(blockNumber: number = 3): Transaction {
+function getTransactionStub(blockNumber: number = 3, undo: boolean = false): Transaction {
   return {
-    undo: false,
+    undo,
     irreversibleBlockNum: 5,
     cursor: "somecursorstring",
     trace: {
@@ -95,12 +95,50 @@ describe("DfuseBlockStreamer", () => {
     expect(stub2).toHaveBeenCalledTimes(1)
   })
 
-  test("should should return a block with the property isEarliestBlock set to true for the first block, even if it is higher than lowBlockNum", () => {
+  test("should return a block with the property isEarliestBlock set to true for the first block", () => {
+    const stub = jest.fn()
+    blockStreamer.addOnBlockListener(stub)
+    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(3))
+    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(4))
+
+    expect(stub.mock.calls[0][0].blockMeta.isEarliestBlock).toEqual(true)
+  })
+
+  test("should return a block with the property isEarliestBlock set to true for the first block, even if it is higher than lowBlockNum", () => {
     const stub = jest.fn()
     blockStreamer.addOnBlockListener(stub)
     ;(blockStreamer as any).onTransactionReceived(getTransactionStub(5))
     ;(blockStreamer as any).onTransactionReceived(getTransactionStub(6))
 
     expect(stub.mock.calls[0][0].blockMeta.isEarliestBlock).toEqual(true)
+  })
+
+  test("should return a block with the property isEarliestBlock set to true for the other blocks", () => {
+    const stub = jest.fn()
+    blockStreamer.addOnBlockListener(stub)
+    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(3))
+    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(4))
+    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(5))
+
+    expect(stub.mock.calls[1][0].blockMeta.isEarliestBlock).toEqual(false)
+  })
+
+  test("should return a block with isRollback: false is the received transactions have undo: false", () => {
+    const stub = jest.fn()
+    blockStreamer.addOnBlockListener(stub)
+    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(3))
+    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(4))
+
+    expect(stub.mock.calls[0][0].blockMeta.isRollback).toEqual(false)
+  })
+
+  test("should return a block with isRollback: true is the received transactions have undo: true", () => {
+    const stub = jest.fn()
+    blockStreamer.addOnBlockListener(stub)
+    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(3))
+    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(3, true))
+    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(4))
+
+    expect(stub.mock.calls[1][0].blockMeta.isRollback).toEqual(true)
   })
 })
