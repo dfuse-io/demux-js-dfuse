@@ -47,6 +47,13 @@ You will need to create your own ActionHandler. For more information on this, [v
 
 To generate a dfuse API key, visit [the dfuse website](https://www.dfuse.io).
 
+The DfuseActionReader class supports the following parameters:
+
+- `dfuseApiKey: string`. Required. An API key that can be obtained from the [dfuse.io website](dfuse.io).
+- `startAtBlock: number`. Optional. Defaults to `1`, which will start streaming from the genesis block. Setting to `0` will start from the current head. A positive integer will start from that block number.
+- `onlyIrreversible: boolean`. Optional. Defaults to `false`. If set to `true`, only irreversible blocks will be fetched
+- `query: string`. Optional. Defaults to `status:executed`. A dfuse SQE query. For more informations, [see the docs](https://docs.dfuse.io/#dfuse-query-language).
+
 ```js
 import { BaseActionWatcher } from "demux"
 import { ObjectActionHandler } from "./ObjectActionHandler"
@@ -56,9 +63,9 @@ import { DfuseActionReader } from "demux-js-dfuse"
 const actionHandler = new ObjectActionHandler([handlerVersion])
 
 const dfuseActionReader = new DfuseActionReader({
+  dfuseApiKey: "YOUR DFUSE API KEY",
   startAtBlock: 1,
-  onlyIrreversible: false,
-  dfuseApiKey: "YOUR DFUSE API KEY"
+  onlyIrreversible: false
 })
 
 const actionWatcher = new BaseActionWatcher(dfuseActionReader, actionHandler, 100)
