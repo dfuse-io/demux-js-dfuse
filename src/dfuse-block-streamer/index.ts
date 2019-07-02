@@ -1,9 +1,10 @@
 import * as Logger from "bunyan"
-import { NextBlock } from "demux"
-import { getApolloClient } from "../util"
+import { Block, BlockInfo, BlockMeta, NextBlock } from "demux"
+import { getApolloClient } from "./dfuse-api"
 import ApolloClient from "apollo-client/ApolloClient"
 import { gql } from "apollo-boost"
 import { Transaction } from "../types"
+import { getPreviousBlockHash, getBlockHash, getBlockNumber } from "../util"
 
 export type DfuseBlockStreamerOptions = {
   dfuseApiKey: string
@@ -32,8 +33,9 @@ export class DfuseBlockStreamer {
   protected activeCursor: string = ""
   protected lowBlockNum: number
   protected currentBlockNumber: number = -1
-  protected currentBlock?: NextBlock
   protected onlyIrreversible: boolean
+  protected currentBlock?: NextBlock
+  private lastPublishedBlock?: NextBlock
 
   constructor(options: DfuseBlockStreamerOptions) {
     const { lowBlockNum, onlyIrreversible } = options
@@ -106,10 +108,54 @@ export class DfuseBlockStreamer {
 
     /*
      * When we see a transaction belonging to a different block than
-     * the previous one, we pushed the previous block into the queue
+     * the previous one, we notify the listeners to the completed block
      */
     if (!isEarliestBlock && isNewBlock) {
+      // If we haven't published a block yet, we will use lowBlockNum as our reference
+      const lastPublishedBlockNumber = this.lastPublishedBlock
+        ? getBlockNumber(this.lastPublishedBlock)
+        : this.lowBlockNum
+
+      const lastIrreversibleBlockNumber = this.lastPublishedBlock
+        ? this.lastPublishedBlock.lastIrreversibleBlockNumber
+        : this.lowBlockNum
+
+      // Generate dummy blocks for the ones not returned by dfuse
+      const dummyBlocksNeeded = getInnerRange(
+        lastPublishedBlockNumber,
+        getBlockNumber(this.currentBlock!)
+      )
+
+      dummyBlocksNeeded.forEach((blockNumber, index) => {
+        /*
+         * If this is the last dummy block to be inserted before a real block, use the
+         * real block's previousBlockHash as the dummy block's hash
+         */
+        const isLastDummyBlock = index === dummyBlocksNeeded.length - 1
+        const previousBlockHash = this.lastPublishedBlock
+          ? getBlockHash(this.lastPublishedBlock)
+          : ""
+        const blockHash =
+          this.currentBlock && isLastDummyBlock ? getPreviousBlockHash(this.currentBlock) : ""
+
+        const nextBlock = getDefaultNextBlock(
+          {
+            blockNumber,
+            blockHash,
+            previousBlockHash
+          },
+          {
+            isEarliestBlock: typeof this.lastPublishedBlock === "undefined"
+          },
+          lastIrreversibleBlockNumber
+        )
+
+        this.notifyListeners(nextBlock)
+        this.lastPublishedBlock = nextBlock
+      })
+
       this.notifyListeners(this.currentBlock!)
+      this.lastPublishedBlock = this.currentBlock
     }
 
     // Create a new current block if necessary
@@ -217,4 +263,45 @@ export class DfuseBlockStreamer {
   private notifyListeners(nextBlock: NextBlock): void {
     this.listeners.forEach((listener) => listener(nextBlock))
   }
+}
+
+function getInnerRange(start: number, end: number): number[] {
+  const range: number[] = []
+
+  for (let i = start + 1; i < end; i++) {
+    range.push(i)
+  }
+
+  return range
+}
+function getDefaultNextBlock(
+  blockInfo: Partial<BlockInfo>,
+  blockMeta: Partial<BlockMeta>,
+  lastIrreversibleBlockNumber: number
+): NextBlock {
+  return {
+    block: {
+      blockInfo: Object.assign({}, defaultBlock.blockInfo, blockInfo),
+      actions: []
+    },
+    blockMeta: Object.assign(
+      {
+        isRollback: false,
+        isNewBlock: true,
+        isEarliestBlock: false
+      },
+      blockMeta
+    ),
+    lastIrreversibleBlockNumber
+  }
+}
+
+const defaultBlock: Block = {
+  blockInfo: {
+    blockNumber: 0,
+    blockHash: "",
+    previousBlockHash: "",
+    timestamp: new Date(0)
+  },
+  actions: []
 }

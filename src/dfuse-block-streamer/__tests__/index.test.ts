@@ -1,7 +1,23 @@
 import { DfuseBlockStreamer } from ".."
 import { Transaction } from "../.."
+import { getPreviousBlockHash, getBlockHash } from "../../util"
 
-function getTransactionStub(blockNumber: number = 3, undo: boolean = false): Transaction {
+type getTransactionParams = Partial<{
+  blockNumber: number
+  blockHash: string
+  undo: boolean
+}>
+
+function getTransactionStub(params: getTransactionParams): Transaction {
+  const { blockNumber, undo, blockHash } = Object.assign(
+    {
+      blockNumber: 3,
+      undo: false,
+      blockHash: `hash${params.blockNumber || 3}`
+    },
+    params
+  )
+
   return {
     undo,
     irreversibleBlockNum: 5,
@@ -11,12 +27,19 @@ function getTransactionStub(blockNumber: number = 3, undo: boolean = false): Tra
       matchingActions: [],
       block: {
         num: blockNumber,
-        id: "someblockhash",
-        previous: "someprevioushash",
+        id: blockHash,
+        previous: `hash${blockNumber - 1}`,
         timestamp: new Date()
       }
     }
   }
+}
+
+function sendTransaction(
+  blockStreamer: DfuseBlockStreamer,
+  transactionParams: getTransactionParams
+) {
+  return (blockStreamer as any).onTransactionReceived(getTransactionStub(transactionParams))
 }
 
 describe("DfuseBlockStreamer", () => {
@@ -43,14 +66,24 @@ describe("DfuseBlockStreamer", () => {
     blockStreamer.addOnBlockListener(stub)
 
     // Send transactions for block #3
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(3))
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(3))
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(3))
+    sendTransaction(blockStreamer, {
+      blockNumber: 3
+    })
+
+    sendTransaction(blockStreamer, {
+      blockNumber: 3
+    })
+
+    sendTransaction(blockStreamer, {
+      blockNumber: 3
+    })
 
     expect(stub).toHaveBeenCalledTimes(0)
 
     // Send transactions for block #4
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(4))
+    sendTransaction(blockStreamer, {
+      blockNumber: 4
+    })
 
     expect(stub).toHaveBeenCalledTimes(1)
   })
@@ -61,8 +94,13 @@ describe("DfuseBlockStreamer", () => {
     blockStreamer.removeOnBlockListener(stub)
 
     // Send a full block
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(3))
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(4))
+    sendTransaction(blockStreamer, {
+      blockNumber: 3
+    })
+
+    sendTransaction(blockStreamer, {
+      blockNumber: 4
+    })
 
     expect(stub).toHaveBeenCalledTimes(0)
   })
@@ -74,8 +112,13 @@ describe("DfuseBlockStreamer", () => {
     blockStreamer.addOnBlockListener(stub2)
 
     // Send a full block
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(3))
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(4))
+    sendTransaction(blockStreamer, {
+      blockNumber: 3
+    })
+
+    sendTransaction(blockStreamer, {
+      blockNumber: 4
+    })
 
     expect(stub1).toHaveBeenCalledTimes(1)
     expect(stub2).toHaveBeenCalledTimes(1)
@@ -88,8 +131,13 @@ describe("DfuseBlockStreamer", () => {
     blockStreamer.addOnBlockListener(stub2)
 
     // Send a full block
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(3))
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(4))
+    sendTransaction(blockStreamer, {
+      blockNumber: 3
+    })
+
+    sendTransaction(blockStreamer, {
+      blockNumber: 4
+    })
 
     expect(stub1).toHaveBeenCalledTimes(1)
     expect(stub2).toHaveBeenCalledTimes(1)
@@ -98,8 +146,13 @@ describe("DfuseBlockStreamer", () => {
   test("should return a block with the property isEarliestBlock set to true for the first block", () => {
     const stub = jest.fn()
     blockStreamer.addOnBlockListener(stub)
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(3))
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(4))
+    sendTransaction(blockStreamer, {
+      blockNumber: 3
+    })
+
+    sendTransaction(blockStreamer, {
+      blockNumber: 4
+    })
 
     expect(stub.mock.calls[0][0].blockMeta.isEarliestBlock).toEqual(true)
   })
@@ -107,8 +160,12 @@ describe("DfuseBlockStreamer", () => {
   test("should return a block with the property isEarliestBlock set to true for the first block, even if it is higher than lowBlockNum", () => {
     const stub = jest.fn()
     blockStreamer.addOnBlockListener(stub)
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(5))
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(6))
+    sendTransaction(blockStreamer, {
+      blockNumber: 5
+    })
+    sendTransaction(blockStreamer, {
+      blockNumber: 6
+    })
 
     expect(stub.mock.calls[0][0].blockMeta.isEarliestBlock).toEqual(true)
   })
@@ -116,9 +173,15 @@ describe("DfuseBlockStreamer", () => {
   test("should return a block with the property isEarliestBlock set to true for the other blocks", () => {
     const stub = jest.fn()
     blockStreamer.addOnBlockListener(stub)
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(3))
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(4))
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(5))
+    sendTransaction(blockStreamer, {
+      blockNumber: 3
+    })
+    sendTransaction(blockStreamer, {
+      blockNumber: 4
+    })
+    sendTransaction(blockStreamer, {
+      blockNumber: 5
+    })
 
     expect(stub.mock.calls[1][0].blockMeta.isEarliestBlock).toEqual(false)
   })
@@ -126,8 +189,13 @@ describe("DfuseBlockStreamer", () => {
   test("should return a block with isRollback: false is the received transactions have undo: false", () => {
     const stub = jest.fn()
     blockStreamer.addOnBlockListener(stub)
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(3))
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(4))
+    sendTransaction(blockStreamer, {
+      blockNumber: 3
+    })
+
+    sendTransaction(blockStreamer, {
+      blockNumber: 4
+    })
 
     expect(stub.mock.calls[0][0].blockMeta.isRollback).toEqual(false)
   })
@@ -135,10 +203,66 @@ describe("DfuseBlockStreamer", () => {
   test("should return a block with isRollback: true is the received transactions have undo: true", () => {
     const stub = jest.fn()
     blockStreamer.addOnBlockListener(stub)
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(3))
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(3, true))
-    ;(blockStreamer as any).onTransactionReceived(getTransactionStub(4))
+    sendTransaction(blockStreamer, {
+      blockNumber: 3
+    })
+
+    sendTransaction(blockStreamer, {
+      blockNumber: 3,
+      undo: true
+    })
+    sendTransaction(blockStreamer, {
+      blockNumber: 4
+    })
 
     expect(stub.mock.calls[1][0].blockMeta.isRollback).toEqual(true)
+  })
+
+  test("should notify subscribers without skipping a block, even if the returned transaction skip blocks", () => {
+    const stub = jest.fn()
+    blockStreamer.addOnBlockListener(stub)
+    sendTransaction(blockStreamer, {
+      blockNumber: 3
+    })
+
+    sendTransaction(blockStreamer, {
+      blockNumber: 6
+    })
+
+    sendTransaction(blockStreamer, {
+      blockNumber: 7
+    })
+
+    expect(stub.mock.calls.length).toEqual(4)
+  })
+
+  test("should keep the previousBlockHash property consistent when generating dummy blocks", () => {
+    const stub = jest.fn()
+    blockStreamer.addOnBlockListener(stub)
+    sendTransaction(blockStreamer, {
+      blockNumber: 3,
+      blockHash: "blockhash3"
+    })
+
+    sendTransaction(blockStreamer, {
+      blockNumber: 6,
+      blockHash: "blockhash6"
+    })
+
+    sendTransaction(blockStreamer, {
+      blockNumber: 7,
+      blockHash: "blockhash7"
+    })
+
+    sendTransaction(blockStreamer, {
+      blockNumber: 8,
+      blockHash: "blockhash8"
+    })
+
+    const { calls } = stub.mock
+
+    expect(getPreviousBlockHash(calls[1][0])).toEqual(getBlockHash(calls[0][0]))
+    expect(getPreviousBlockHash(calls[2][0])).toEqual(getBlockHash(calls[1][0]))
+    expect(getPreviousBlockHash(calls[3][0])).toEqual(getBlockHash(calls[2][0]))
   })
 })

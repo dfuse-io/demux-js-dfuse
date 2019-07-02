@@ -1,4 +1,4 @@
-import { AbstractActionReader, ActionReaderOptions, Block, NextBlock } from "demux"
+import { AbstractActionReader, ActionReaderOptions, Block, BlockInfo, NextBlock } from "demux"
 import { DfuseBlockStreamer } from "../dfuse-block-streamer"
 import { waitUntil } from "../util"
 
@@ -27,7 +27,6 @@ type DfuseActionReaderOptions = ActionReaderOptions & {
  * expectation, the streamed blocks will be put in a FIFO queue, where demux can find them.
  */
 export class DfuseActionReader extends AbstractActionReader {
-  protected headInfoInitialized: boolean = false
   protected activeCursor: string = ""
   protected blockQueue: NextBlock[] = []
   protected blockStreamer: DfuseBlockStreamer
@@ -101,7 +100,9 @@ export class DfuseActionReader extends AbstractActionReader {
     if (firstBlockNumber > blockNumber) {
       // If the first block in the queue is higher than the block we are asking, return a generic block
       // this.log.info(`Returning default block for num ${blockNumber}`)
-      return getDefaultBlock(blockNumber)
+      return this.getDefaultBlock({
+        blockNumber
+      })
     } else if (firstBlockNumber === blockNumber) {
       // If the first block in the queue is the one that was requested, return it and remove it from the queue
       this.blockQueue.shift()
@@ -130,17 +131,30 @@ export class DfuseActionReader extends AbstractActionReader {
     // If the queue is empty, wait for apollo to return new results.
     await waitUntil(() => this.blockQueue.length > 0)
 
-    const nextBlock = this.blockQueue.shift()
+    let nextBlock: NextBlock
 
-    if (this.currentBlockNumber < this.headBlockNumber) {
-      if (nextBlock!.blockMeta.isRollback === false) {
-        ;(this as any).acceptBlock(nextBlock!.block)
+    // console.log(
+    //   "Current block number ",
+    //   this.currentBlockNumber,
+    //   " first in queue ",
+    //   this.blockQueue[0].block.blockInfo.blockNumber
+    // )
+
+    if (this.currentBlockNumber + 1 === this.blockQueue[0].block.blockInfo.blockNumber) {
+      nextBlock = this.blockQueue.shift() as NextBlock
+
+      if (nextBlock.blockMeta.isRollback === false) {
+        // Hack to make the block's previousHash property match the previous block,
+        // if the previous block wasnt returned by dfuse and we had to return a generic block
+        // todo is there a better solution than this?
+        // console.log("fooo", this.currentBlockData.blockInfo.blockHash)
+        ;(this as any).acceptBlock(nextBlock.block)
       } else {
         // console.log("FORK!!!")
         await this.resolveFork()
       }
     }
-
+    // console.log(nextBlock!)
     return nextBlock!
   }
 
@@ -157,6 +171,13 @@ export class DfuseActionReader extends AbstractActionReader {
   protected async setup(): Promise<void> {
     return
   }
+
+  protected getDefaultBlock(blockInfo: Partial<BlockInfo>): Block {
+    return {
+      blockInfo: Object.assign({}, defaultBlock.blockInfo, blockInfo),
+      actions: []
+    }
+  }
 }
 
 const defaultBlock: Block = {
@@ -169,14 +190,6 @@ const defaultBlock: Block = {
   actions: []
 }
 
-function getDefaultBlock(blockNumber: number = 0): Block {
-  return {
-    blockInfo: Object.assign({}, defaultBlock.blockInfo, {
-      blockNumber
-    }),
-    actions: []
-  }
-}
 const block1: Block = {
   blockInfo: {
     blockNumber: 1,
