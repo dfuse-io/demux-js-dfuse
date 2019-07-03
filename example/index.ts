@@ -39,11 +39,11 @@ const actionHandler = new ObjectActionHandler([handlerVersion])
  * mode, where we start at an offset of the most recent blocks.
  */
 const dfuseActionReader = new DfuseActionReader({
-  startAtBlock: 0, // default is 1, which means start at genesis block
-  onlyIrreversible: false,
+  startAtBlock: -100,
+  onlyIrreversible: true,
   dfuseApiKey: process.env.DFUSE_API_KEY as string,
-  query: "status:executed", // Any dfuse SQE query, default is "status:executed"
-  network: "mainnet" // Default is "mainnet"
+  // query: "account:eosknightsio",
+  network: "mainnet"
 })
 
 const actionWatcher = new BaseActionWatcher(dfuseActionReader, actionHandler, 100)

@@ -111,23 +111,34 @@ export class DfuseBlockStreamer {
      * the previous one, we notify the listeners to the completed block
      */
     if (!isEarliestBlock && isNewBlock) {
-      // If we haven't published a block yet, we will use lowBlockNum as our reference
+      /**
+       * If we haven't published a block yet, we will use lowBlockNum as our
+       * reference for last published block
+       */
       const lastPublishedBlockNumber = this.lastPublishedBlock
         ? getBlockNumber(this.lastPublishedBlock)
-        : this.lowBlockNum
+        : this.lowBlockNum - 1
 
-      const lastIrreversibleBlockNumber = this.lastPublishedBlock
-        ? this.lastPublishedBlock.lastIrreversibleBlockNumber
-        : this.lowBlockNum
+      /**
+       * Generate dummy blocks for the ones not returned by dfuse, if lastPublishedBlockNumber
+       * is -2, which means lowBlowNum was set to -1 and we should start from the head of the chain.
+       */
+      let dummyBlocksNeeded: number[] = []
 
-      // Generate dummy blocks for the ones not returned by dfuse
-      const dummyBlocksNeeded = getInnerRange(
-        lastPublishedBlockNumber,
-        getBlockNumber(this.currentBlock!)
-      )
-
+      if (lastPublishedBlockNumber >= -1) {
+        dummyBlocksNeeded = getInnerRange(
+          lastPublishedBlockNumber,
+          getBlockNumber(this.currentBlock!)
+        )
+      } else {
+        dummyBlocksNeeded = getInnerRange(
+          irreversibleBlockNum - 1,
+          getBlockNumber(this.currentBlock!)
+        )
+      }
+      console.log("dummyBlocksNeeded", dummyBlocksNeeded)
       dummyBlocksNeeded.forEach((blockNumber, index) => {
-        /*
+        /**
          * If this is the last dummy block to be inserted before a real block, use the
          * real block's previousBlockHash as the dummy block's hash
          */
@@ -147,13 +158,17 @@ export class DfuseBlockStreamer {
           {
             isEarliestBlock: typeof this.lastPublishedBlock === "undefined"
           },
-          lastIrreversibleBlockNumber
+          irreversibleBlockNum
         )
 
+        /**
+         * Notify the listeners that a dummy block was created
+         */
         this.notifyListeners(nextBlock)
         this.lastPublishedBlock = nextBlock
       })
 
+      this.currentBlock!.blockMeta.isEarliestBlock = typeof this.lastPublishedBlock === "undefined"
       this.notifyListeners(this.currentBlock!)
       this.lastPublishedBlock = this.currentBlock
     }
@@ -174,7 +189,7 @@ export class DfuseBlockStreamer {
         blockMeta: {
           isRollback: undo,
           isNewBlock: true,
-          isEarliestBlock
+          isEarliestBlock: false
         },
         lastIrreversibleBlockNumber: irreversibleBlockNum
       }
@@ -266,6 +281,7 @@ export class DfuseBlockStreamer {
 }
 
 function getInnerRange(start: number, end: number): number[] {
+  // console.log("getInnerRange", start, end)
   const range: number[] = []
 
   for (let i = start + 1; i < end; i++) {

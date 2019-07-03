@@ -1,6 +1,6 @@
 import { AbstractActionReader, ActionReaderOptions, Block, BlockInfo, NextBlock } from "demux"
 import { DfuseBlockStreamer } from "../dfuse-block-streamer"
-import { waitUntil } from "../util"
+import { waitUntil, getBlockNumber } from "../util"
 
 type DfuseActionReaderOptions = ActionReaderOptions & {
   dfuseApiKey: string
@@ -17,7 +17,7 @@ type DfuseActionReaderOptions = ActionReaderOptions & {
  * be missing.
  *
  * Because demux-js needs to see every block one by one, when a block that didn't match the dfuse query is
- * required, we return a dummy GenericBlock that contains no actions to get demux-js to move forward to the
+ * required, we generate dummy blocks that contains no actions to get demux-js to move forward to the
  * next block in the chain.
  *
  * Since we only actually fetch the blocks that interest us, we can see great performance gains.
@@ -37,10 +37,10 @@ export class DfuseActionReader extends AbstractActionReader {
     const { dfuseApiKey, network, startAtBlock, query } = options
 
     // Patch for an issue where dfuse doesnt return blocks 1 and 2
-    if (this.startAtBlock > 0 && this.startAtBlock < 3) {
-      this.startAtBlock = 3
-      this.currentBlockNumber = 2
-    }
+    // if (this.startAtBlock > 0 && this.startAtBlock < 3) {
+    //   this.startAtBlock = 3
+    //   this.currentBlockNumber = 2
+    // }
 
     this.blockStreamer = new DfuseBlockStreamer({
       dfuseApiKey,
@@ -60,6 +60,7 @@ export class DfuseActionReader extends AbstractActionReader {
   }
 
   private onBlock(nextBlock: NextBlock) {
+    console.log("Graphql onBlock", nextBlock.block.blockInfo.blockNumber)
     /*
      * When we are seeing a new block, we need to update our head reference
      * Math.max is used in case an "undo" trx is returned, with a lower block
@@ -82,48 +83,37 @@ export class DfuseActionReader extends AbstractActionReader {
     this.blockQueue.push(nextBlock)
   }
 
-  public async getBlock(blockNumber: number): Promise<Block> {
+  public async getBlock(requestedBlockNumber: number): Promise<Block> {
+    console.log("getBlock", requestedBlockNumber)
+
     // Patch around the issues caused by Dfuse not returning anything for blocks 1 and 2
-    if (blockNumber === 1) {
+    if (requestedBlockNumber === 1) {
       return block1
     }
-    if (blockNumber === 2) {
+    if (requestedBlockNumber === 2) {
       return block2
     }
 
-    // If the queue is empty, wait for apollo to return new results.
+    // If the queue is empty, wait for the dfuse api to return new results.
     await waitUntil(() => this.blockQueue.length > 0)
 
-    const firstBlock = this.blockQueue[0]
-    const firstBlockNumber = firstBlock.block.blockInfo.blockNumber
+    const queuedBlock = this.blockQueue[0]
 
-    if (firstBlockNumber > blockNumber) {
-      // If the first block in the queue is higher than the block we are asking, return a generic block
-      // this.log.info(`Returning default block for num ${blockNumber}`)
-      return this.getDefaultBlock({
-        blockNumber
-      })
-    } else if (firstBlockNumber === blockNumber) {
-      // If the first block in the queue is the one that was requested, return it and remove it from the queue
-      this.blockQueue.shift()
-
-      // Hack to make the block's previousHash property match the previous block,
-      // if the previous block wasnt returned by dfuse and we had to return a generic block
-      // todo is there a better solution than this?
-      if (this.currentBlockData.blockInfo.blockHash === "") {
-        firstBlock.block.blockInfo.previousBlockHash = ""
-      }
-      return firstBlock.block
+    console.log(
+      `getBlock first block ${getBlockNumber(queuedBlock)}, requested ${requestedBlockNumber}`
+    )
+    if (getBlockNumber(queuedBlock) === requestedBlockNumber) {
+      return (this.blockQueue.shift() as NextBlock).block
     } else {
-      // todo clean this up. this should be handled more gracefully.
-      const queuedBlockNumbers = this.blockQueue.map((x) => x.block.blockInfo.blockNumber)
-      throw new Error(
-        `Could not find block number ${blockNumber} in queue containing blocks ${queuedBlockNumbers}`
-      )
+      // Return a generic block
+      return this.getDefaultBlock({
+        blockNumber: requestedBlockNumber
+      })
     }
   }
 
   public async getNextBlock(): Promise<NextBlock> {
+    console.log("getNextBlock")
     if (!this.initialized) {
       await this.initialize()
     }
@@ -132,29 +122,30 @@ export class DfuseActionReader extends AbstractActionReader {
     await waitUntil(() => this.blockQueue.length > 0)
 
     let nextBlock: NextBlock
+    const nextBlockNumber = this.currentBlockNumber + 1
+    const queuedBlockNumber = getBlockNumber(this.blockQueue[0])
 
-    // console.log(
-    //   "Current block number ",
-    //   this.currentBlockNumber,
-    //   " first in queue ",
-    //   this.blockQueue[0].block.blockInfo.blockNumber
-    // )
+    console.log(`current+1 ${nextBlockNumber}, queued ${queuedBlockNumber}`)
+    console.log("queue length", this.blockQueue.map((block) => block.block.blockInfo.blockNumber))
 
-    if (this.currentBlockNumber + 1 === this.blockQueue[0].block.blockInfo.blockNumber) {
+    while (this.blockQueue.length > 0 && nextBlockNumber < queuedBlockNumber) {
+      this.blockQueue.shift()
+    }
+
+    if (nextBlockNumber === queuedBlockNumber) {
       nextBlock = this.blockQueue.shift() as NextBlock
 
       if (nextBlock.blockMeta.isRollback === false) {
         // Hack to make the block's previousHash property match the previous block,
         // if the previous block wasnt returned by dfuse and we had to return a generic block
         // todo is there a better solution than this?
-        // console.log("fooo", this.currentBlockData.blockInfo.blockHash)
         ;(this as any).acceptBlock(nextBlock.block)
       } else {
         // console.log("FORK!!!")
         await this.resolveFork()
       }
     }
-    // console.log(nextBlock!)
+
     return nextBlock!
   }
 

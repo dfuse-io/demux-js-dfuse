@@ -45,11 +45,19 @@ function updateTransferData(state, payload, blockInfo, context) {
   context.stateCopy = JSON.parse(JSON.stringify(state)) // Deep copy state to de-reference
 }
 
+function logRebirth(state, payload, blockInfo, context) {
+  console.log(`EOSKnights player ${payload.data.from} has rebirthed with block ${blockInfo.blockNumber}.`)
+}
+
 const updaters = [
   {
     actionType: "eosio.token::transfer",
     apply: updateTransferData,
   },
+  {
+    actionType: "eosknightsio::rebirth3",
+    apply: logRebirth
+  }
 ]
 
 
