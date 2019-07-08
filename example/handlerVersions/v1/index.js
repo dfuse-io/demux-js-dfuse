@@ -46,7 +46,7 @@ function updateTransferData(state, payload, blockInfo, context) {
 }
 
 function logRebirth(state, payload, blockInfo, context) {
-  console.log(`EOSKnights player ${payload.data.from} has rebirthed with block ${blockInfo.blockNumber}.`)
+  console.log(`EOSKnights player ${payload.data.from} has rebirthed with block #${blockInfo.blockNumber}.`)
 }
 
 const updaters = [

@@ -1,4 +1,4 @@
-import { AbstractActionReader, ActionReaderOptions, Block, BlockInfo, NextBlock } from "demux"
+import { IActionReader, ActionReaderOptions, Block, BlockInfo, NextBlock, ReaderInfo } from "demux"
 import { DfuseBlockStreamer } from "../dfuse-block-streamer"
 import { waitUntil, getBlockNumber } from "../util"
 
@@ -26,15 +26,29 @@ type DfuseActionReaderOptions = ActionReaderOptions & {
  * this is is not necessary, since we can stream only the blocks we want via the graphl api. To circumvent this
  * expectation, the streamed blocks will be put in a FIFO queue, where demux can find them.
  */
-export class DfuseActionReader extends AbstractActionReader {
+export class DfuseActionReader implements IActionReader {
+  public startAtBlock: number
+  public headBlockNumber: number = 0
+  public currentBlockNumber: number
   protected activeCursor: string = ""
   protected blockQueue: NextBlock[] = []
   protected blockStreamer: DfuseBlockStreamer
+  protected onlyIrreversible: boolean
+  protected currentBlockData: Block = defaultBlock
+  protected lastIrreversibleBlockNumber: number = 0
+  protected initialized: boolean = false
 
   constructor(options: DfuseActionReaderOptions) {
-    super(options)
+    const optionsWithDefaults = {
+      startAtBlock: 1,
+      onlyIrreversible: false,
+      ...options
+    }
+    this.startAtBlock = optionsWithDefaults.startAtBlock
+    this.currentBlockNumber = optionsWithDefaults.startAtBlock - 1
+    this.onlyIrreversible = optionsWithDefaults.onlyIrreversible
 
-    const { dfuseApiKey, network, startAtBlock, query } = options
+    const { dfuseApiKey, network, query } = optionsWithDefaults
 
     // Patch for an issue where dfuse doesnt return blocks 1 and 2
     // if (this.startAtBlock > 0 && this.startAtBlock < 3) {
@@ -47,11 +61,21 @@ export class DfuseActionReader extends AbstractActionReader {
       network,
       query,
       onlyIrreversible: this.onlyIrreversible,
-      lowBlockNum: startAtBlock
+      lowBlockNum: this.startAtBlock
     })
 
     this.onBlock = this.onBlock.bind(this)
     this.streamBlocks()
+  }
+
+  public async initialize(): Promise<void> {
+    await waitUntil(() => this.blockQueue.length > 0)
+
+    if (this.currentBlockNumber < 0) {
+      this.currentBlockNumber = getBlockNumber(this.blockQueue[0]) - 1
+    }
+
+    this.initialized = true
   }
 
   private async streamBlocks(): Promise<void> {
@@ -60,7 +84,7 @@ export class DfuseActionReader extends AbstractActionReader {
   }
 
   private onBlock(nextBlock: NextBlock) {
-    console.log("Graphql onBlock", nextBlock.block.blockInfo.blockNumber)
+    // console.log("Graphql onBlock", nextBlock.block.blockInfo.blockNumber)
     /*
      * When we are seeing a new block, we need to update our head reference
      * Math.max is used in case an "undo" trx is returned, with a lower block
@@ -68,7 +92,7 @@ export class DfuseActionReader extends AbstractActionReader {
      * must be higher than the head block we have previously seen due to the
      * longest chain prevailing in case of a fork
      */
-    this.headBlockNumber = Math.max(this.headBlockNumber, nextBlock.block.blockInfo.blockNumber)
+    this.headBlockNumber = Math.max(this.headBlockNumber, getBlockNumber(nextBlock))
 
     /*
      * Update the reference to the last irreversible block number,
@@ -100,7 +124,7 @@ export class DfuseActionReader extends AbstractActionReader {
     const queuedBlock = this.blockQueue[0]
 
     console.log(
-      `getBlock first block ${getBlockNumber(queuedBlock)}, requested ${requestedBlockNumber}`
+      `getBlock requested #${requestedBlockNumber}, in queue #${getBlockNumber(queuedBlock)}`
     )
     if (getBlockNumber(queuedBlock) === requestedBlockNumber) {
       return (this.blockQueue.shift() as NextBlock).block
@@ -112,23 +136,39 @@ export class DfuseActionReader extends AbstractActionReader {
     }
   }
 
+  public async seekToBlock(blockNumber: number): Promise<void> {
+    //  this.headBlockNumber = await this.getLatestNeededBlockNumber()
+    //  if (blockNumber < this.startAtBlock) {
+    //    throw new ImproperStartAtBlockError()
+    //  }
+    //  if (blockNumber > this.headBlockNumber) {
+    //    throw new ImproperSeekToBlockError(blockNumber)
+    //  }
+    //  this.currentBlockNumber = blockNumber - 1
+  }
+
   public async getNextBlock(): Promise<NextBlock> {
-    console.log("getNextBlock")
+    console.log("getNextBlock 1")
+    // If the queue is empty, wait for apollo to return new results.
+    await waitUntil(() => {
+      console.log("getNextBlock 1.3", this.blockQueue.length)
+      return this.blockQueue.length > 0
+    })
+    console.log("getNextBlock 1.5")
     if (!this.initialized) {
       await this.initialize()
     }
+    console.log("getNextBlock 2")
 
-    // If the queue is empty, wait for apollo to return new results.
-    await waitUntil(() => this.blockQueue.length > 0)
-
+    console.log("getNextBlock 3")
     let nextBlock: NextBlock
     const nextBlockNumber = this.currentBlockNumber + 1
     const queuedBlockNumber = getBlockNumber(this.blockQueue[0])
 
-    console.log(`current+1 ${nextBlockNumber}, queued ${queuedBlockNumber}`)
-    console.log("queue length", this.blockQueue.map((block) => block.block.blockInfo.blockNumber))
+    console.log(`Looking for #${nextBlockNumber}, queued is #${queuedBlockNumber}`)
+    console.log(`${this.blockQueue.length} blocks in the queue`)
 
-    while (this.blockQueue.length > 0 && nextBlockNumber < queuedBlockNumber) {
+    while (this.blockQueue.length > 0 && nextBlockNumber > queuedBlockNumber) {
       this.blockQueue.shift()
     }
 
@@ -139,11 +179,24 @@ export class DfuseActionReader extends AbstractActionReader {
         // Hack to make the block's previousHash property match the previous block,
         // if the previous block wasnt returned by dfuse and we had to return a generic block
         // todo is there a better solution than this?
-        ;(this as any).acceptBlock(nextBlock.block)
+        this.acceptBlock(nextBlock.block)
       } else {
         // console.log("FORK!!!")
-        await this.resolveFork()
+        // await this.resolveFork()
       }
+    } else if (nextBlockNumber < queuedBlockNumber) {
+      nextBlock = {
+        block: this.getDefaultBlock({
+          blockNumber: nextBlockNumber
+        }),
+        blockMeta: {
+          isRollback: false,
+          isEarliestBlock: false,
+          isNewBlock: true
+        },
+        lastIrreversibleBlockNumber: this.lastIrreversibleBlockNumber
+      }
+      this.acceptBlock(nextBlock.block)
     }
 
     return nextBlock!
@@ -159,15 +212,26 @@ export class DfuseActionReader extends AbstractActionReader {
     return this.lastIrreversibleBlockNumber
   }
 
-  protected async setup(): Promise<void> {
-    return
-  }
-
   protected getDefaultBlock(blockInfo: Partial<BlockInfo>): Block {
     return {
       blockInfo: Object.assign({}, defaultBlock.blockInfo, blockInfo),
       actions: []
     }
+  }
+
+  public get info(): ReaderInfo {
+    return {
+      currentBlockNumber: this.currentBlockNumber,
+      startAtBlock: this.startAtBlock,
+      headBlockNumber: this.headBlockNumber,
+      onlyIrreversible: this.onlyIrreversible,
+      lastIrreversibleBlockNumber: this.lastIrreversibleBlockNumber
+    }
+  }
+
+  private acceptBlock(blockData: Block) {
+    this.currentBlockData = blockData
+    this.currentBlockNumber = this.currentBlockData.blockInfo.blockNumber
   }
 }
 

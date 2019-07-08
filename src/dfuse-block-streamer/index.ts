@@ -5,6 +5,7 @@ import ApolloClient from "apollo-client/ApolloClient"
 import { gql } from "apollo-boost"
 import { Transaction } from "../types"
 import { getPreviousBlockHash, getBlockHash, getBlockNumber } from "../util"
+import { waitFor } from "@dfuse/client"
 
 export type DfuseBlockStreamerOptions = {
   dfuseApiKey: string
@@ -121,7 +122,7 @@ export class DfuseBlockStreamer {
 
       /**
        * Generate dummy blocks for the ones not returned by dfuse, if lastPublishedBlockNumber
-       * is -2, which means lowBlowNum was set to -1 and we should start from the head of the chain.
+       * is -2, which means lowBlockNum was set to -1 and we should start from the head of the chain.
        */
       let dummyBlocksNeeded: number[] = []
 
@@ -130,13 +131,14 @@ export class DfuseBlockStreamer {
           lastPublishedBlockNumber,
           getBlockNumber(this.currentBlock!)
         )
+        console.log(`Creating ${dummyBlocksNeeded.length} dummy blocks`)
       } else {
-        dummyBlocksNeeded = getInnerRange(
-          irreversibleBlockNum - 1,
-          getBlockNumber(this.currentBlock!)
-        )
+        // dummyBlocksNeeded = getInnerRange(
+        //   irreversibleBlockNum - 1,
+        //   getBlockNumber(this.currentBlock!)
+        // )
       }
-      console.log("dummyBlocksNeeded", dummyBlocksNeeded)
+
       dummyBlocksNeeded.forEach((blockNumber, index) => {
         /**
          * If this is the last dummy block to be inserted before a real block, use the
@@ -165,6 +167,7 @@ export class DfuseBlockStreamer {
          * Notify the listeners that a dummy block was created
          */
         this.notifyListeners(nextBlock)
+
         this.lastPublishedBlock = nextBlock
       })
 

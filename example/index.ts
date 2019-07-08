@@ -4,7 +4,7 @@
  */
 
 import dotenv from "dotenv"
-import { BaseActionWatcher } from "demux"
+import { BaseActionWatcher } from "../../demux-js/src"
 import { DfuseActionReader } from "../src"
 dotenv.config()
 
@@ -39,14 +39,17 @@ const actionHandler = new ObjectActionHandler([handlerVersion])
  * mode, where we start at an offset of the most recent blocks.
  */
 const dfuseActionReader = new DfuseActionReader({
-  startAtBlock: -100,
+  startAtBlock: 10000,
   onlyIrreversible: true,
   dfuseApiKey: process.env.DFUSE_API_KEY as string,
-  // query: "account:eosknightsio",
-  network: "mainnet"
+  query: "account:eosknightsio",
+  network: "jungle"
 })
 
-const actionWatcher = new BaseActionWatcher(dfuseActionReader, actionHandler, 100)
+const actionWatcher = new BaseActionWatcher(dfuseActionReader, actionHandler, {
+  logLevel: "fatal",
+  pollInterval: 100
+})
 
 actionWatcher.watch()
 

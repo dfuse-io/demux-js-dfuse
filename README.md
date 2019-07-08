@@ -50,7 +50,7 @@ To generate a dfuse API key, visit [the dfuse website](https://www.dfuse.io).
 The DfuseActionReader class supports the following parameters:
 
 - `dfuseApiKey: string`. Required. An API key that can be obtained from the [dfuse.io website](dfuse.io).
-- `startAtBlock: number`. Optional. Defaults to `1`, which will start streaming from the genesis block. Setting to `0` will start from the current head. A positive integer will start from that block number.
+- `startAtBlock: number`. Optional. Defaults to `1`. For positive values, this sets the first block that this will start at. For negative values, this will start at (most recent block + startAtBlock), effectively tailing the chain. Be careful when using this feature, as this will make your starting block dynamic.
 - `onlyIrreversible: boolean`. Optional. Defaults to `false`. If set to `true`, only irreversible blocks will be fetched
 - `query: string`. Optional. Defaults to `status:executed`. A dfuse SQE query. For more informations, [see the docs](https://docs.dfuse.io/#dfuse-query-language).
 
