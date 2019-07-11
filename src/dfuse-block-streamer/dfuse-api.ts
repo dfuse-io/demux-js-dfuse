@@ -1,3 +1,4 @@
+import Logger, { createLogger, LogLevel } from "bunyan"
 import { createDfuseClient } from "@dfuse/client"
 import fetch from "node-fetch"
 import WebSocketConnection from "ws"
@@ -5,6 +6,11 @@ import { WebSocketLink } from "apollo-link-ws"
 import { SubscriptionClient } from "subscriptions-transport-ws"
 import { InMemoryCache } from "apollo-boost"
 import ApolloClient from "apollo-client/ApolloClient"
+
+const logger = createLogger({
+  name: "demux-dfuse",
+  level: "error"
+})
 
 function getDfuseClient(apiKey: string, network: string) {
   /*
@@ -71,22 +77,22 @@ export function getApolloClient(params: getApolloClientParams) {
 
   // TODO: how should this be handled?
   subscriptionClient.onConnecting(() => {
-    console.log("Connecting")
+    logger.trace("Connecting")
   })
   subscriptionClient.onConnected(() => {
-    console.log("Connected")
+    logger.trace("Connected")
   })
   subscriptionClient.onReconnecting(() => {
-    console.log("Reconnecting")
+    logger.trace("Reconnecting")
   })
   subscriptionClient.onReconnected(() => {
-    console.log("Reconnected")
+    logger.trace("Reconnected")
   })
   subscriptionClient.onDisconnected(() => {
-    console.log("Disconnected")
+    logger.trace("Disconnected")
   })
   subscriptionClient.onError((error) => {
-    console.log("Apollo Subscription Error", error.message)
+    logger.error("Apollo Subscription Error", error.message)
   })
 
   return new ApolloClient({

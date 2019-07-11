@@ -1,4 +1,4 @@
-import * as Logger from "bunyan"
+import Logger, { createLogger, LogLevel } from "bunyan"
 import { NextBlock } from "demux"
 import { getApolloClient } from "./dfuse-api"
 import ApolloClient from "apollo-client"
@@ -11,6 +11,7 @@ export type DfuseBlockStreamerOptions = {
   lowBlockNum?: number
   query?: string
   onlyIrreversible: boolean
+  logLevel?: LogLevel
 }
 
 type OnBlockListener = (nextBlock: NextBlock) => void
@@ -40,9 +41,12 @@ export class DfuseBlockStreamer {
   public isStreaming: boolean = false
 
   constructor(options: DfuseBlockStreamerOptions) {
-    const { lowBlockNum, onlyIrreversible } = options
+    const { logLevel, lowBlockNum, onlyIrreversible } = options
 
-    this.log = Logger.createLogger({ name: "demux-dfuse" })
+    this.log = createLogger({
+      name: "demux-dfuse",
+      level: (logLevel || "error") as LogLevel
+    })
     this.lowBlockNum = typeof lowBlockNum !== "undefined" ? lowBlockNum : 1
     this.dfuseApiKey = options.dfuseApiKey
     this.network = options.network || "mainnet"

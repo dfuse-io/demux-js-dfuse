@@ -1,4 +1,4 @@
-import * as Logger from "bunyan"
+import Logger, { createLogger, LogLevel } from "bunyan"
 import { IActionReader, ActionReaderOptions, Block, BlockInfo, NextBlock, ReaderInfo } from "demux"
 import { DfuseBlockStreamer } from "../dfuse-block-streamer"
 import { waitUntil, getBlockNumber } from "../util"
@@ -45,21 +45,19 @@ export class DfuseActionReader implements IActionReader {
     const optionsWithDefaults = {
       startAtBlock: 1,
       onlyIrreversible: false,
+      logLevel: "error",
       ...options
     }
 
     this.startAtBlock = optionsWithDefaults.startAtBlock
     this.currentBlockNumber = optionsWithDefaults.startAtBlock - 1
     this.onlyIrreversible = optionsWithDefaults.onlyIrreversible
-    this.log = Logger.createLogger({ name: "demux-dfuse" })
+    this.log = createLogger({
+      name: "demux-dfuse",
+      level: optionsWithDefaults.logLevel as LogLevel
+    })
 
     const { dfuseApiKey, network, query } = optionsWithDefaults
-
-    // Patch for an issue where dfuse doesnt return blocks 1 and 2
-    // if (this.startAtBlock > 0 && this.startAtBlock < 3) {
-    //   this.startAtBlock = 3
-    //   this.currentBlockNumber = 2
-    // }
 
     this.blockStreamer = new DfuseBlockStreamer({
       dfuseApiKey,
@@ -128,6 +126,8 @@ export class DfuseActionReader implements IActionReader {
   }
 
   public async getNextBlock(): Promise<NextBlock> {
+    this.log.trace("DfuseActionReader.getNextBlock()", this.nextBlockNeeded)
+
     // If the queue is empty, wait for graphql to return new results.
     await waitUntil(() => {
       return this.blockQueue.length > 0
