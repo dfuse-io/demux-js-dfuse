@@ -57,8 +57,9 @@ class ObjectActionHandler extends AbstractActionHandler {
   }
 
   async updateIndexState(stateObj, block, isReplay, handlerVersionName) {
-    stateObj.indexState.blockNumber = block.blockInfo.blockNumber
-    stateObj.indexState.blockHash = block.blockInfo.blockHash
+    const { blockNumber, blockHash } = block.block.blockInfo
+    stateObj.indexState.blockNumber = blockNumber
+    stateObj.indexState.blockHash = blockHash
     stateObj.indexState.isReplay = isReplay
     stateObj.indexState.handlerVersionName = handlerVersionName
   }

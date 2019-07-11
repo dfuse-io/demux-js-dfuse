@@ -86,7 +86,7 @@ export function getApolloClient(params: getApolloClientParams) {
     console.log("Disconnected")
   })
   subscriptionClient.onError((error) => {
-    console.log("Error", error)
+    console.log("Apollo Subscription Error", error.message)
   })
 
   return new ApolloClient({

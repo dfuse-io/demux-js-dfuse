@@ -1,11 +1,9 @@
 import * as Logger from "bunyan"
-import { Block, BlockInfo, BlockMeta, NextBlock } from "demux"
+import { NextBlock } from "demux"
 import { getApolloClient } from "./dfuse-api"
-import ApolloClient from "apollo-client/ApolloClient"
+import ApolloClient from "apollo-client"
 import { gql } from "apollo-boost"
 import { Transaction } from "../types"
-import { getPreviousBlockHash, getBlockHash, getBlockNumber } from "../util"
-import { waitFor } from "@dfuse/client"
 
 export type DfuseBlockStreamerOptions = {
   dfuseApiKey: string
@@ -25,18 +23,21 @@ type OnBlockListener = (nextBlock: NextBlock) => void
  * to listeners via a PubSub pattern it implements.
  */
 export class DfuseBlockStreamer {
-  protected log: Logger
-  protected dfuseApiKey: string
-  protected network: string
-  protected query: string
-  protected apolloClient?: ApolloClient<any>
-  protected listeners: OnBlockListener[] = []
-  protected activeCursor: string = ""
-  protected lowBlockNum: number
-  protected currentBlockNumber: number = -1
-  protected onlyIrreversible: boolean
-  protected currentBlock?: NextBlock
+  private log: Logger
+  private dfuseApiKey: string
+  private network: string
+  private query: string
+  private apolloClient?: ApolloClient<any>
+  private listeners: OnBlockListener[] = []
+  private activeCursor: string = ""
+  private lowBlockNum: number
+  private currentBlockNumber: number = -1
+  private onlyIrreversible: boolean
+  private currentBlock?: NextBlock
   private lastPublishedBlock?: NextBlock
+  private transactionProcessing: Promise<void> = Promise.resolve()
+  private observableSubscription: any // todo find how to get Apollo's observable type - its not exported
+  public isStreaming: boolean = false
 
   constructor(options: DfuseBlockStreamerOptions) {
     const { lowBlockNum, onlyIrreversible } = options
@@ -73,23 +74,31 @@ export class DfuseBlockStreamer {
   public stream() {
     this.log.trace("DfuseBlockStreamer.stream()")
 
+    this.isStreaming = true
+
     if (!this.apolloClient) {
       this.apolloClient = this.getApolloClient()
     }
 
-    this.getObservableSubscription({
-      apolloClient: this.apolloClient!,
-      lowBlockNum: this.lowBlockNum
+    this.observableSubscription = this.getObservableSubscription({
+      apolloClient: this.apolloClient!
     }).subscribe({
       start: () => {
         this.log.trace("DfuseBlockStreamer GraphQL subscription started")
       },
-      next: (value) => {
-        this.onTransactionReceived(value.data.searchTransactionsForward)
+      next: (value: any) => {
+        /**
+         * This promise queueing trick is important because onTransactionReceived
+         * might take a while to resolve if it has to create a large number of dummy
+         * blocks, to fill large gaps between blocks returned by dfuse.
+         */
+        this.transactionProcessing = this.transactionProcessing.then(async () => {
+          await this.onTransactionReceived(value.data.searchTransactionsForward)
+        })
       },
-      error: (error) => {
+      error: (error: Error) => {
         // TODO should we be doing anything else?
-        this.log.error("DfuseBlockStreamer GraphQL subscription error", error)
+        // this.log.error("DfuseBlockStreamer GraphQL subscription error", error.message)
       },
       complete: () => {
         // TODO: how to handle completion? Will we ever reach completion?
@@ -98,7 +107,17 @@ export class DfuseBlockStreamer {
     })
   }
 
-  private onTransactionReceived(transaction: Transaction) {
+  public pause() {
+    this.log.trace("DfuseBlockStreamer.pause()")
+
+    this.isStreaming = false
+    this.observableSubscription.unsubscribe()
+    this.observableSubscription = null
+  }
+
+  private async onTransactionReceived(transaction: Transaction) {
+    this.log.trace("DfuseBlockStreamer.onTransactionReceived()")
+
     const { undo, trace, irreversibleBlockNum } = transaction
     const { matchingActions, block } = trace
 
@@ -112,71 +131,14 @@ export class DfuseBlockStreamer {
      * the previous one, we notify the listeners to the completed block
      */
     if (!isEarliestBlock && isNewBlock) {
-      /**
-       * If we haven't published a block yet, we will use lowBlockNum as our
-       * reference for last published block
-       */
-      const lastPublishedBlockNumber = this.lastPublishedBlock
-        ? getBlockNumber(this.lastPublishedBlock)
-        : this.lowBlockNum - 1
-
-      /**
-       * Generate dummy blocks for the ones not returned by dfuse, if lastPublishedBlockNumber
-       * is -2, which means lowBlockNum was set to -1 and we should start from the head of the chain.
-       */
-      let dummyBlocksNeeded: number[] = []
-
-      if (lastPublishedBlockNumber >= -1) {
-        dummyBlocksNeeded = getInnerRange(
-          lastPublishedBlockNumber,
-          getBlockNumber(this.currentBlock!)
-        )
-        console.log(`Creating ${dummyBlocksNeeded.length} dummy blocks`)
-      } else {
-        // dummyBlocksNeeded = getInnerRange(
-        //   irreversibleBlockNum - 1,
-        //   getBlockNumber(this.currentBlock!)
-        // )
-      }
-
-      dummyBlocksNeeded.forEach((blockNumber, index) => {
-        /**
-         * If this is the last dummy block to be inserted before a real block, use the
-         * real block's previousBlockHash as the dummy block's hash
-         */
-        const isLastDummyBlock = index === dummyBlocksNeeded.length - 1
-        const previousBlockHash = this.lastPublishedBlock
-          ? getBlockHash(this.lastPublishedBlock)
-          : ""
-        const blockHash =
-          this.currentBlock && isLastDummyBlock ? getPreviousBlockHash(this.currentBlock) : ""
-
-        const nextBlock = getDefaultNextBlock(
-          {
-            blockNumber,
-            blockHash,
-            previousBlockHash
-          },
-          {
-            isEarliestBlock: typeof this.lastPublishedBlock === "undefined"
-          },
-          irreversibleBlockNum
-        )
-
-        /**
-         * Notify the listeners that a dummy block was created
-         */
-        this.notifyListeners(nextBlock)
-
-        this.lastPublishedBlock = nextBlock
-      })
-
       this.currentBlock!.blockMeta.isEarliestBlock = typeof this.lastPublishedBlock === "undefined"
       this.notifyListeners(this.currentBlock!)
       this.lastPublishedBlock = this.currentBlock
     }
 
-    // Create a new current block if necessary
+    /*
+     * Create a new current block if necessary
+     */
     if (isNewBlock) {
       this.currentBlockNumber = transaction.trace.block.num
       this.currentBlock = {
@@ -198,7 +160,7 @@ export class DfuseBlockStreamer {
       }
     }
 
-    // Insert matching actions into the current block
+    /* Insert matching actions into the current block */
     matchingActions.forEach((action: any) => {
       this.currentBlock!.block.actions.push({
         type: `${action.account}::${action.name}`,
@@ -213,18 +175,14 @@ export class DfuseBlockStreamer {
       })
     })
 
-    // TODO: This isn't currently doing anything
     this.activeCursor = transaction.cursor
   }
 
   /**
    * Creates and returns an Apollo observable query
    */
-  private getObservableSubscription(options: {
-    apolloClient: ApolloClient<any>
-    lowBlockNum: number
-  }) {
-    const { apolloClient, lowBlockNum } = options
+  private getObservableSubscription(params: { apolloClient: ApolloClient<any> }) {
+    const { apolloClient } = params
 
     return apolloClient.subscribe({
       query: gql`
@@ -267,7 +225,7 @@ export class DfuseBlockStreamer {
         cursor: this.activeCursor,
         query: this.query,
         onlyIrreversible: this.onlyIrreversible,
-        lowBlockNum
+        lowBlockNum: this.lowBlockNum
       }
     })
   }
@@ -281,46 +239,4 @@ export class DfuseBlockStreamer {
   private notifyListeners(nextBlock: NextBlock): void {
     this.listeners.forEach((listener) => listener(nextBlock))
   }
-}
-
-function getInnerRange(start: number, end: number): number[] {
-  // console.log("getInnerRange", start, end)
-  const range: number[] = []
-
-  for (let i = start + 1; i < end; i++) {
-    range.push(i)
-  }
-
-  return range
-}
-function getDefaultNextBlock(
-  blockInfo: Partial<BlockInfo>,
-  blockMeta: Partial<BlockMeta>,
-  lastIrreversibleBlockNumber: number
-): NextBlock {
-  return {
-    block: {
-      blockInfo: Object.assign({}, defaultBlock.blockInfo, blockInfo),
-      actions: []
-    },
-    blockMeta: Object.assign(
-      {
-        isRollback: false,
-        isNewBlock: true,
-        isEarliestBlock: false
-      },
-      blockMeta
-    ),
-    lastIrreversibleBlockNumber
-  }
-}
-
-const defaultBlock: Block = {
-  blockInfo: {
-    blockNumber: 0,
-    blockHash: "",
-    previousBlockHash: "",
-    timestamp: new Date(0)
-  },
-  actions: []
 }

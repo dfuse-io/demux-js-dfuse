@@ -1,3 +1,4 @@
+import * as Logger from "bunyan"
 import { IActionReader, ActionReaderOptions, Block, BlockInfo, NextBlock, ReaderInfo } from "demux"
 import { DfuseBlockStreamer } from "../dfuse-block-streamer"
 import { waitUntil, getBlockNumber } from "../util"
@@ -37,6 +38,8 @@ export class DfuseActionReader implements IActionReader {
   protected currentBlockData: Block = defaultBlock
   protected lastIrreversibleBlockNumber: number = 0
   protected initialized: boolean = false
+  private nextBlockNeeded: number = 0
+  private log: Logger
 
   constructor(options: DfuseActionReaderOptions) {
     const optionsWithDefaults = {
@@ -44,9 +47,11 @@ export class DfuseActionReader implements IActionReader {
       onlyIrreversible: false,
       ...options
     }
+
     this.startAtBlock = optionsWithDefaults.startAtBlock
     this.currentBlockNumber = optionsWithDefaults.startAtBlock - 1
     this.onlyIrreversible = optionsWithDefaults.onlyIrreversible
+    this.log = Logger.createLogger({ name: "demux-dfuse" })
 
     const { dfuseApiKey, network, query } = optionsWithDefaults
 
@@ -75,6 +80,8 @@ export class DfuseActionReader implements IActionReader {
       this.currentBlockNumber = getBlockNumber(this.blockQueue[0]) - 1
     }
 
+    this.nextBlockNeeded = getBlockNumber(this.blockQueue[0])
+
     this.initialized = true
   }
 
@@ -84,7 +91,12 @@ export class DfuseActionReader implements IActionReader {
   }
 
   private onBlock(nextBlock: NextBlock) {
-    // console.log("Graphql onBlock", nextBlock.block.blockInfo.blockNumber)
+    this.log.trace(`Adding block #${getBlockNumber(nextBlock)} to the queue.`)
+
+    if (this.blockQueue.length > 5 && this.blockStreamer.isStreaming) {
+      // this.blockStreamer.pause()
+    }
+
     /*
      * When we are seeing a new block, we need to update our head reference
      * Math.max is used in case an "undo" trx is returned, with a lower block
@@ -108,73 +120,40 @@ export class DfuseActionReader implements IActionReader {
   }
 
   public async getBlock(requestedBlockNumber: number): Promise<Block> {
-    console.log("getBlock", requestedBlockNumber)
-
-    // Patch around the issues caused by Dfuse not returning anything for blocks 1 and 2
-    if (requestedBlockNumber === 1) {
-      return block1
-    }
-    if (requestedBlockNumber === 2) {
-      return block2
-    }
-
-    // If the queue is empty, wait for the dfuse api to return new results.
-    await waitUntil(() => this.blockQueue.length > 0)
-
-    const queuedBlock = this.blockQueue[0]
-
-    console.log(
-      `getBlock requested #${requestedBlockNumber}, in queue #${getBlockNumber(queuedBlock)}`
-    )
-    if (getBlockNumber(queuedBlock) === requestedBlockNumber) {
-      return (this.blockQueue.shift() as NextBlock).block
-    } else {
-      // Return a generic block
-      return this.getDefaultBlock({
-        blockNumber: requestedBlockNumber
-      })
-    }
+    return defaultBlock
   }
 
   public async seekToBlock(blockNumber: number): Promise<void> {
-    //  this.headBlockNumber = await this.getLatestNeededBlockNumber()
-    //  if (blockNumber < this.startAtBlock) {
-    //    throw new ImproperStartAtBlockError()
-    //  }
-    //  if (blockNumber > this.headBlockNumber) {
-    //    throw new ImproperSeekToBlockError(blockNumber)
-    //  }
-    //  this.currentBlockNumber = blockNumber - 1
+    this.nextBlockNeeded = blockNumber
   }
 
   public async getNextBlock(): Promise<NextBlock> {
-    console.log("getNextBlock 1")
-    // If the queue is empty, wait for apollo to return new results.
+    // If the queue is empty, wait for graphql to return new results.
     await waitUntil(() => {
-      console.log("getNextBlock 1.3", this.blockQueue.length)
       return this.blockQueue.length > 0
     })
-    console.log("getNextBlock 1.5")
+
     if (!this.initialized) {
       await this.initialize()
     }
-    console.log("getNextBlock 2")
 
-    console.log("getNextBlock 3")
     let nextBlock: NextBlock
-    const nextBlockNumber = this.currentBlockNumber + 1
     const queuedBlockNumber = getBlockNumber(this.blockQueue[0])
 
-    console.log(`Looking for #${nextBlockNumber}, queued is #${queuedBlockNumber}`)
-    console.log(`${this.blockQueue.length} blocks in the queue`)
-
-    while (this.blockQueue.length > 0 && nextBlockNumber > queuedBlockNumber) {
+    // If the block we need is higher than the queued block, shift the queue
+    while (this.blockQueue.length > 0 && this.nextBlockNeeded > queuedBlockNumber) {
       this.blockQueue.shift()
     }
 
-    if (nextBlockNumber === queuedBlockNumber) {
+    // If the queued block is the one we need, return it
+    if (this.nextBlockNeeded === queuedBlockNumber) {
+      // console.log(`getNextBlock: ${this.nextBlockNeeded} found at the start of the queue.`)
       nextBlock = this.blockQueue.shift() as NextBlock
+      nextBlock.block.blockInfo.previousBlockHash = this.currentBlockData
+        ? this.currentBlockData.blockInfo.blockHash
+        : "dummy-block-hash"
 
+      // todo handle rollbacks
       if (nextBlock.blockMeta.isRollback === false) {
         // Hack to make the block's previousHash property match the previous block,
         // if the previous block wasnt returned by dfuse and we had to return a generic block
@@ -184,10 +163,14 @@ export class DfuseActionReader implements IActionReader {
         // console.log("FORK!!!")
         // await this.resolveFork()
       }
-    } else if (nextBlockNumber < queuedBlockNumber) {
+    } else if (this.nextBlockNeeded < queuedBlockNumber) {
+      // If the next block we need is lower than the queued block, return a dummy block
       nextBlock = {
         block: this.getDefaultBlock({
-          blockNumber: nextBlockNumber
+          blockNumber: this.nextBlockNeeded,
+          previousBlockHash: this.currentBlockData
+            ? this.currentBlockData.blockInfo.blockHash
+            : "dummy-block-hash"
         }),
         blockMeta: {
           isRollback: false,
@@ -198,6 +181,11 @@ export class DfuseActionReader implements IActionReader {
       }
       this.acceptBlock(nextBlock.block)
     }
+
+    // In most cases, this.nextBlockNeeded will be set by the ActionWatch directly.
+    // However, there are some cases (on the very first block received), where it doesn't.
+    // This patches the problem by forcibly moving to the next block as a default.
+    this.nextBlockNeeded++
 
     return nextBlock!
   }
@@ -241,25 +229,6 @@ const defaultBlock: Block = {
     blockHash: "",
     previousBlockHash: "",
     timestamp: new Date(0)
-  },
-  actions: []
-}
-
-const block1: Block = {
-  blockInfo: {
-    blockNumber: 1,
-    blockHash: "00000001405147477ab2f5f51cda427b638191c66d2c59aa392d5c2c98076cb0",
-    previousBlockHash: "",
-    timestamp: new Date("2018-06-08T08:08:08.000Z")
-  },
-  actions: []
-}
-const block2: Block = {
-  blockInfo: {
-    blockNumber: 2,
-    blockHash: "0000000267f3e2284b482f3afc2e724be1d6cbc1804532ec62d4e7af47c30693",
-    previousBlockHash: "00000001405147477ab2f5f51cda427b638191c66d2c59aa392d5c2c98076cb0",
-    timestamp: new Date("2018-06-08T08:08:08.000Z")
   },
   actions: []
 }
