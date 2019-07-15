@@ -45,7 +45,7 @@ export class DfuseActionReader implements IActionReader {
     const optionsWithDefaults = {
       startAtBlock: 1,
       onlyIrreversible: false,
-      logLevel: "error",
+      logLevel: "info",
       ...options
     }
 
@@ -74,6 +74,10 @@ export class DfuseActionReader implements IActionReader {
   public async initialize(): Promise<void> {
     await waitUntil(() => this.blockQueue.length > 0)
 
+    /*
+     * If current block number is a negative int, we need to
+     * set it to the number of the first block dfuse returns
+     */
     if (this.currentBlockNumber < 0) {
       this.currentBlockNumber = getBlockNumber(this.blockQueue[0]) - 1
     }
@@ -91,8 +95,17 @@ export class DfuseActionReader implements IActionReader {
   private onBlock(nextBlock: NextBlock) {
     this.log.trace(`Adding block #${getBlockNumber(nextBlock)} to the queue.`)
 
-    if (this.blockQueue.length > 5 && this.blockStreamer.isStreaming) {
-      // this.blockStreamer.pause()
+    let nextHeadBlockNumber = getBlockNumber(nextBlock)
+
+    /*
+     * If we haven't reached the live marker yet, make sure we don't let the actionWatcher
+     * think it reached the head. Because dfuse does not give us the head block number when
+     * streaming blocks, but rather a live marker, the synchronous nature of
+     * actionWatcher.checkForBlocks can sometimes trick itself into thinking it reached the
+     * head because it processed blocks faster than the API could return them.
+     */
+    if (!this.blockStreamer.isLiveMarkerReached()) {
+      nextHeadBlockNumber++
     }
 
     /*
@@ -102,7 +115,7 @@ export class DfuseActionReader implements IActionReader {
      * must be higher than the head block we have previously seen due to the
      * longest chain prevailing in case of a fork
      */
-    this.headBlockNumber = Math.max(this.headBlockNumber, getBlockNumber(nextBlock))
+    this.headBlockNumber = Math.max(this.headBlockNumber, nextHeadBlockNumber)
 
     /*
      * Update the reference to the last irreversible block number,
@@ -148,6 +161,12 @@ export class DfuseActionReader implements IActionReader {
     // If the queued block is the one we need, return it
     if (this.nextBlockNeeded === queuedBlockNumber) {
       // console.log(`getNextBlock: ${this.nextBlockNeeded} found at the start of the queue.`)
+
+      /*
+       * Hack to make the block's previousHash property match the previous block,
+       * if the previous block wasnt returned by dfuse and we had to return a generic block
+       * todo is there a better solution than this?
+       */
       nextBlock = this.blockQueue.shift() as NextBlock
       nextBlock.block.blockInfo.previousBlockHash = this.currentBlockData
         ? this.currentBlockData.blockInfo.blockHash
@@ -155,12 +174,8 @@ export class DfuseActionReader implements IActionReader {
 
       // todo handle rollbacks
       if (nextBlock.blockMeta.isRollback === false) {
-        // Hack to make the block's previousHash property match the previous block,
-        // if the previous block wasnt returned by dfuse and we had to return a generic block
-        // todo is there a better solution than this?
         this.acceptBlock(nextBlock.block)
       } else {
-        // console.log("FORK!!!")
         // await this.resolveFork()
       }
     } else if (this.nextBlockNeeded < queuedBlockNumber) {

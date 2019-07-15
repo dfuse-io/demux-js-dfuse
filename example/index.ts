@@ -39,8 +39,8 @@ const actionHandler = new ObjectActionHandler([handlerVersion])
  * mode, where we start at an offset of the most recent blocks.
  */
 const dfuseActionReader = new DfuseActionReader({
-  startAtBlock: -1,
-  onlyIrreversible: true,
+  startAtBlock: -100,
+  onlyIrreversible: false,
   dfuseApiKey: process.env.DFUSE_API_KEY as string,
   query: "account:eosknightsio",
   network: "mainnet"
@@ -50,6 +50,6 @@ const actionWatcher = new BaseActionWatcher(dfuseActionReader, actionHandler, {
   logLevel: "error"
 })
 
-actionWatcher.watch()
+actionWatcher.watch(true)
 
 console.log("Watching...")

@@ -66,6 +66,11 @@ class ObjectActionHandler extends AbstractActionHandler {
 
   async rollbackTo(blockNumber) {
     const latestBlockNumber = state.indexState.blockNumber
+
+    if (blockNumber >= latestBlockNumber) {
+      return
+    }
+
     const toDelete = [...Array(latestBlockNumber - blockNumber).keys()].map(
       (n) => n + blockNumber + 1
     )

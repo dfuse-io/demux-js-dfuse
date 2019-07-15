@@ -60,7 +60,7 @@ export function getApolloClient(params: getApolloClientParams) {
       reconnect: true,
       connectionCallback: (error?: any) => {
         if (error) {
-          console.log("Unable to correctly initialize connection", error)
+          console.log("Apollo client unable to correctly initialize connection", error)
           process.exit(1)
         }
       },

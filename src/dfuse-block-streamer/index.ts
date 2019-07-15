@@ -37,8 +37,7 @@ export class DfuseBlockStreamer {
   private currentBlock?: NextBlock
   private lastPublishedBlock?: NextBlock
   private transactionProcessing: Promise<void> = Promise.resolve()
-  private observableSubscription: any // todo find how to get Apollo's observable type - its not exported
-  public isStreaming: boolean = false
+  private liveMarkerReached: boolean = false
 
   constructor(options: DfuseBlockStreamerOptions) {
     const { logLevel, lowBlockNum, onlyIrreversible } = options
@@ -78,13 +77,11 @@ export class DfuseBlockStreamer {
   public stream() {
     this.log.trace("DfuseBlockStreamer.stream()")
 
-    this.isStreaming = true
-
     if (!this.apolloClient) {
       this.apolloClient = this.getApolloClient()
     }
 
-    this.observableSubscription = this.getObservableSubscription({
+    this.getObservableSubscription({
       apolloClient: this.apolloClient!
     }).subscribe({
       start: () => {
@@ -111,18 +108,23 @@ export class DfuseBlockStreamer {
     })
   }
 
-  public pause() {
-    this.log.trace("DfuseBlockStreamer.pause()")
-
-    this.isStreaming = false
-    this.observableSubscription.unsubscribe()
-    this.observableSubscription = null
+  public isLiveMarkerReached(): boolean {
+    return this.liveMarkerReached
   }
 
   private async onTransactionReceived(transaction: Transaction) {
     this.log.trace("DfuseBlockStreamer.onTransactionReceived()")
 
-    const { undo, trace, irreversibleBlockNum } = transaction
+    const { cursor, undo, trace, irreversibleBlockNum } = transaction
+
+    /*
+     * If trace is null, it means that we received a liveMarker.
+     */
+    if (!trace) {
+      this.liveMarkerReached = true
+      return
+    }
+
     const { matchingActions, block } = trace
 
     const isEarliestBlock = this.currentBlockNumber === -1
@@ -144,7 +146,7 @@ export class DfuseBlockStreamer {
      * Create a new current block if necessary
      */
     if (isNewBlock) {
-      this.currentBlockNumber = transaction.trace.block.num
+      this.currentBlockNumber = trace.block.num
       this.currentBlock = {
         block: {
           actions: [],
@@ -166,20 +168,22 @@ export class DfuseBlockStreamer {
 
     /* Insert matching actions into the current block */
     matchingActions.forEach((action: any) => {
+      const { id, account, name, authorization, data } = action
+
       this.currentBlock!.block.actions.push({
-        type: `${action.account}::${action.name}`,
+        type: `${account}::${name}`,
         payload: {
-          transactionId: trace.id,
+          transactionId: id,
           actionIndex: 0,
-          account: action.account,
-          name: action.name,
-          authorization: action.authorization,
-          data: action.data
+          account,
+          name,
+          authorization,
+          data
         }
       })
     })
 
-    this.activeCursor = transaction.cursor
+    this.activeCursor = cursor
   }
 
   /**
@@ -201,6 +205,7 @@ export class DfuseBlockStreamer {
             cursor: $cursor
             lowBlockNum: $lowBlockNum
             irreversibleOnly: $onlyIrreversible
+            liveMarkerInterval: 1000
           ) {
             undo
             irreversibleBlockNum

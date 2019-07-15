@@ -960,7 +960,7 @@ builtin-modules@^3.1.0:
   resolved "https://registry.yarnpkg.com/builtin-modules/-/builtin-modules-3.1.0.tgz#aad97c15131eb76b65b50ef208e7584cd76a7484"
   integrity sha512-k0KL0aWZuBt2lrxrcASWDfwOLMnodeQjodT/1SxEQAXsHANgo6ZC/VEaSEHCXt7aSTZ4/4H5LKa+tBXmW7Vtvw==
 
-bunyan@1.8.12:
+bunyan@1.8.12, bunyan@^1.8.12:
   version "1.8.12"
   resolved "https://registry.yarnpkg.com/bunyan/-/bunyan-1.8.12.tgz#f150f0f6748abdd72aeae84f04403be2ef113797"
   integrity sha1-8VDw9nSKvdcq6uhPBEA74u8RN5c=
@@ -1342,9 +1342,9 @@ delegates@^1.0.0:
   resolved "https://registry.yarnpkg.com/delegates/-/delegates-1.0.0.tgz#84c6e159b81904fdca59a0ef44cd870d31250f9a"
   integrity sha1-hMbhWbgZBP3KWaDvRM2HDTElD5o=
 
-"demux@git+https://github.com/olivierbeaulieu/demux-js#602401f815458d23d83e08eac290235ee5e43884":
+"demux@ssh://git@github.com:olivierbeaulieu/demux-js#602401f815458d23d83e08eac290235ee5e43884":
   version "5.0.2"
-  resolved "git+https://github.com/olivierbeaulieu/demux-js#602401f815458d23d83e08eac290235ee5e43884"
+  resolved "ssh://git@github.com:olivierbeaulieu/demux-js#602401f815458d23d83e08eac290235ee5e43884"
   dependencies:
     bunyan "1.8.12"
     express "4.16.4"

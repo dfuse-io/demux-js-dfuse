@@ -1,6 +1,5 @@
 import { DfuseBlockStreamer, DfuseBlockStreamerOptions } from ".."
 import { Transaction } from "../../types"
-import { getPreviousBlockHash, getBlockHash, getBlockNumber } from "../../util"
 
 type getTransactionParams = Partial<{
   blockNumber: number
@@ -8,7 +7,7 @@ type getTransactionParams = Partial<{
   undo: boolean
 }>
 
-function getTransactionStub(params: getTransactionParams): Transaction {
+function getTransactionStub(params: getTransactionParams, isLiveMarker: boolean): Transaction {
   const { blockNumber, undo, blockHash } = Object.assign(
     {
       blockNumber: 3,
@@ -18,28 +17,35 @@ function getTransactionStub(params: getTransactionParams): Transaction {
     params
   )
 
+  const trace = isLiveMarker
+    ? null
+    : {
+        id: "sometraceid",
+        matchingActions: [],
+        block: {
+          num: blockNumber,
+          id: blockHash,
+          previous: `hash${blockNumber - 1}`,
+          timestamp: new Date()
+        }
+      }
+
   return {
     undo,
     irreversibleBlockNum: 5,
     cursor: "somecursorstring",
-    trace: {
-      id: "sometraceid",
-      matchingActions: [],
-      block: {
-        num: blockNumber,
-        id: blockHash,
-        previous: `hash${blockNumber - 1}`,
-        timestamp: new Date()
-      }
-    }
+    trace
   }
 }
 
 function sendTransaction(
   blockStreamer: DfuseBlockStreamer,
-  transactionParams: getTransactionParams
+  transactionParams: getTransactionParams,
+  isLiveMarker: boolean = false
 ) {
-  return (blockStreamer as any).onTransactionReceived(getTransactionStub(transactionParams))
+  return (blockStreamer as any).onTransactionReceived(
+    getTransactionStub(transactionParams, isLiveMarker)
+  )
 }
 
 function getBlockStreamerMock(options?: Partial<DfuseBlockStreamerOptions>): DfuseBlockStreamer {
@@ -86,7 +92,6 @@ describe("DfuseBlockStreamer", () => {
 
     expect(stub).toHaveBeenCalledTimes(0)
 
-    // Send transactions for block #4
     sendTransaction(blockStreamer, {
       blockNumber: 4
     })
@@ -243,82 +248,51 @@ describe("DfuseBlockStreamer", () => {
     expect(stub.mock.calls[1][0].blockMeta.isRollback).toEqual(true)
   })
 
-  test.skip("should not skip a block, even if the first transaction is higher than lowBlockNum", () => {
-    const stub = jest.fn()
-    blockStreamer.addOnBlockListener(stub)
-    sendTransaction(blockStreamer, {
-      blockNumber: 5
+  describe("#isLiveMarkerReached()", () => {
+    test("should return false when the marker has not been reached", () => {
+      blockStreamer = getBlockStreamerMock({
+        lowBlockNum: -3
+      })
+
+      const stub = jest.fn()
+      blockStreamer.addOnBlockListener(stub)
+
+      sendTransaction(blockStreamer, {
+        blockNumber: 500
+      })
+      sendTransaction(blockStreamer, {
+        blockNumber: 501
+      })
+      sendTransaction(blockStreamer, {
+        blockNumber: 500
+      })
+
+      expect(blockStreamer.isLiveMarkerReached()).toEqual(false)
     })
 
-    sendTransaction(blockStreamer, {
-      blockNumber: 6
+    test("should return true when the marker has been reached", () => {
+      blockStreamer = getBlockStreamerMock({
+        lowBlockNum: -3
+      })
+
+      const stub = jest.fn()
+      blockStreamer.addOnBlockListener(stub)
+
+      sendTransaction(blockStreamer, {
+        blockNumber: 500
+      })
+      sendTransaction(blockStreamer, {
+        blockNumber: 501
+      })
+      sendTransaction(
+        blockStreamer,
+        {
+          blockNumber: 500
+        },
+        true
+      )
+
+      expect(blockStreamer.isLiveMarkerReached()).toEqual(true)
     })
-
-    const { calls } = stub.mock
-
-    expect(getBlockNumber(calls[0][0])).toEqual(3)
-    expect(getBlockNumber(calls[1][0])).toEqual(4)
-    expect(getBlockNumber(calls[2][0])).toEqual(5)
-  })
-
-  test.skip("should start at block 0 if lowBlockNum is set to 0", () => {
-    blockStreamer = getBlockStreamerMock({
-      lowBlockNum: 0
-    })
-
-    const stub = jest.fn()
-    blockStreamer.addOnBlockListener(stub)
-    sendTransaction(blockStreamer, {
-      blockNumber: 3
-    })
-
-    sendTransaction(blockStreamer, {
-      blockNumber: 4
-    })
-
-    const { calls } = stub.mock
-
-    expect(getBlockNumber(calls[0][0])).toEqual(0)
-  })
-
-  test.skip("should start at block 1 if lowBlockNum is set to 1", () => {
-    blockStreamer = getBlockStreamerMock({
-      lowBlockNum: 1
-    })
-
-    const stub = jest.fn()
-    blockStreamer.addOnBlockListener(stub)
-    sendTransaction(blockStreamer, {
-      blockNumber: 3
-    })
-
-    sendTransaction(blockStreamer, {
-      blockNumber: 4
-    })
-
-    const { calls } = stub.mock
-
-    expect(getBlockNumber(calls[0][0])).toEqual(1)
-  })
-
-  test.skip("should start at block before the head of the chain if lowBlockNum is set to -1", () => {
-    blockStreamer = getBlockStreamerMock({
-      lowBlockNum: -1
-    })
-
-    const stub = jest.fn()
-    blockStreamer.addOnBlockListener(stub)
-    sendTransaction(blockStreamer, {
-      blockNumber: 500
-    })
-
-    sendTransaction(blockStreamer, {
-      blockNumber: 501
-    })
-
-    const { calls } = stub.mock
-
-    expect(getBlockNumber(calls[0][0])).toEqual(499)
-    expect(getBlockNumber(calls[1][0])).toEqual(500)
   })
 })

@@ -32,7 +32,7 @@
     "lint": "tslint 'src/**/*.ts'",
     "lint:specific": "tslint",
     "start": "tsc --module commonjs --watch",
-    "run:example": "node -r ts-node/register example/index.ts",
+    "run:example": "node -r ts-node/register example/index.ts | bunyan",
     "test": "jest --coverage"
   },
   "husky": {
@@ -91,7 +91,8 @@
     "apollo-cache-inmemory": "^1.6.2",
     "apollo-client": "^2.6.3",
     "apollo-link-ws": "^1.0.18",
-    "demux": "olivierbeaulieu/demux-js#602401f815458d23d83e08eac290235ee5e43884",
+    "bunyan": "^1.8.12",
+    "demux": "ssh://git@github.com:olivierbeaulieu/demux-js#602401f815458d23d83e08eac290235ee5e43884",
     "graphql": "^14.3.1",
     "subscriptions-transport-ws": "^0.9.16",
     "ws": "^7.0.1"

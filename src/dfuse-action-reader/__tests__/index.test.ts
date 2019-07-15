@@ -1,35 +1,45 @@
 import { DfuseActionReader } from ".."
 import { DfuseBlockStreamer } from "../../dfuse-block-streamer"
-import { Block } from "demux"
+import { BlockInfo, NextBlock, BlockMeta } from "demux"
 
 jest.mock("../../dfuse-block-streamer")
 
 const MockedDfuseBlockStreamer = DfuseBlockStreamer as jest.Mock<DfuseBlockStreamer>
 
-function getBlockStub(blockNumber: number = 1): Block {
+function getNextBlockStub(
+  params: {
+    blockInfo?: Partial<BlockInfo>
+    blockMeta?: Partial<BlockMeta>
+    lastIrreversibleBlockNumber?: number
+  } = {}
+): NextBlock {
+  const { blockInfo = {}, blockMeta = {}, lastIrreversibleBlockNumber = 0 } = params
   return {
-    actions: [],
-    blockInfo: {
-      blockNumber,
-      blockHash: "acbdefg12346576",
-      timestamp: new Date(),
-      previousBlockHash: "xyz999"
-    }
+    block: {
+      actions: [],
+      blockInfo: {
+        blockNumber: 0,
+        blockHash: "acbdefg12346576",
+        timestamp: new Date(),
+        previousBlockHash: "xyz999",
+        ...blockInfo
+      }
+    },
+    blockMeta: {
+      isNewBlock: true,
+      isRollback: false,
+      isEarliestBlock: false,
+      ...blockMeta
+    },
+    lastIrreversibleBlockNumber
   }
 }
 
-function sendBlock(
-  actionReader: DfuseActionReader,
-  block: Block,
-  lastIrreversibleBlockNumber: number
-) {
+function sendNextBlock(actionReader: DfuseActionReader, nextBlock: NextBlock) {
   // TODO this code is brittle - it will fail if addOnBlockListener is called multiple times in a single test
   const onBlockCallback = MockedDfuseBlockStreamer.prototype.addOnBlockListener.mock.calls[0][0]
-  onBlockCallback.call(actionReader, {
-    block,
-    lastIrreversibleBlockNumber,
-    undo: false
-  })
+
+  onBlockCallback.call(actionReader, nextBlock)
 }
 
 describe("DfuseActionReader", () => {
@@ -88,7 +98,7 @@ describe("DfuseActionReader", () => {
 
       let returned = false
 
-      // Make sure the function doesnt return before sendBlock is called
+      // Make sure the function doesnt return before sendNextBlock is called
       const promise = actionReader.getHeadBlockNumber().then((blockNum) => {
         returned = true
         return blockNum
@@ -96,51 +106,125 @@ describe("DfuseActionReader", () => {
 
       expect(returned).toBe(false)
 
-      sendBlock(actionReader, getBlockStub(5), 3)
+      sendNextBlock(
+        actionReader,
+        getNextBlockStub({
+          blockInfo: {
+            blockNumber: 5
+          },
+          lastIrreversibleBlockNumber: 3
+        })
+      )
 
       // Account for the small delay used in waitUntil()
       const headBlockNumber = await promise
 
-      expect(headBlockNumber).toBe(5)
+      expect(headBlockNumber).toBe(6)
     })
 
-    test("should return the latest block number when a higher block is received", async () => {
+    test("should return the latest block number + 1 when a higher block is received", async () => {
       const actionReader = new DfuseActionReader({
         startAtBlock: 0,
         onlyIrreversible: false,
         dfuseApiKey: apiKey
       })
 
-      sendBlock(actionReader, getBlockStub(5), 3)
+      sendNextBlock(
+        actionReader,
+        getNextBlockStub({
+          blockInfo: {
+            blockNumber: 5
+          },
+          lastIrreversibleBlockNumber: 3
+        })
+      )
 
       await actionReader.getHeadBlockNumber().then((blockNum) => {
-        expect(blockNum).toBe(5)
+        expect(blockNum).toBe(6)
       })
 
-      sendBlock(actionReader, getBlockStub(6), 3)
+      sendNextBlock(
+        actionReader,
+        getNextBlockStub({
+          blockInfo: {
+            blockNumber: 6
+          },
+          lastIrreversibleBlockNumber: 3
+        })
+      )
+
+      await actionReader.getHeadBlockNumber().then((blockNum) => {
+        expect(blockNum).toBe(7)
+      })
+    })
+
+    test("should not return the latest block number + 1 when a lower block is received", async () => {
+      const actionReader = new DfuseActionReader({
+        startAtBlock: 0,
+        onlyIrreversible: false,
+        dfuseApiKey: apiKey
+      })
+
+      sendNextBlock(
+        actionReader,
+        getNextBlockStub({
+          blockInfo: {
+            blockNumber: 5
+          },
+          lastIrreversibleBlockNumber: 3
+        })
+      )
+
+      await actionReader.getHeadBlockNumber().then((blockNum) => {
+        expect(blockNum).toBe(6)
+      })
+
+      sendNextBlock(
+        actionReader,
+        getNextBlockStub({
+          blockInfo: {
+            blockNumber: 4
+          },
+          lastIrreversibleBlockNumber: 3
+        })
+      )
 
       await actionReader.getHeadBlockNumber().then((blockNum) => {
         expect(blockNum).toBe(6)
       })
     })
 
-    test("should not return the latest block number when a lower block is received", async () => {
+    test("should return the latest block number when a the blockStreamer has reached the live marker", async () => {
       const actionReader = new DfuseActionReader({
         startAtBlock: 0,
         onlyIrreversible: false,
         dfuseApiKey: apiKey
       })
 
-      sendBlock(actionReader, getBlockStub(5), 3)
+      sendNextBlock(
+        actionReader,
+        getNextBlockStub({
+          blockInfo: {
+            blockNumber: 5
+          },
+          lastIrreversibleBlockNumber: 3
+        })
+      )
+
+      MockedDfuseBlockStreamer.prototype.isLiveMarkerReached.mockImplementationOnce(() => true)
+
+      sendNextBlock(
+        actionReader,
+        getNextBlockStub({
+          blockInfo: {
+            blockNumber: 6
+          },
+          lastIrreversibleBlockNumber: 3
+        })
+      )
 
       await actionReader.getHeadBlockNumber().then((blockNum) => {
-        expect(blockNum).toBe(5)
-      })
-
-      sendBlock(actionReader, getBlockStub(4), 3)
-
-      await actionReader.getHeadBlockNumber().then((blockNum) => {
-        expect(blockNum).toBe(5)
+        expect(blockNum).toBe(6)
       })
     })
   })
@@ -155,7 +239,7 @@ describe("DfuseActionReader", () => {
 
       let returned = false
 
-      // Make sure the function doesnt return before sendBlock is called
+      // Make sure the function doesnt return before sendNextBlock is called
       const promise = actionReader.getLastIrreversibleBlockNumber().then((blockNum) => {
         returned = true
         return blockNum
@@ -163,7 +247,15 @@ describe("DfuseActionReader", () => {
 
       expect(returned).toBe(false)
 
-      sendBlock(actionReader, getBlockStub(5), 3)
+      sendNextBlock(
+        actionReader,
+        getNextBlockStub({
+          blockInfo: {
+            blockNumber: 5
+          },
+          lastIrreversibleBlockNumber: 3
+        })
+      )
 
       // Account for the small delay used in waitUntil()
       const headBlockNumber = await promise
@@ -178,13 +270,29 @@ describe("DfuseActionReader", () => {
         dfuseApiKey: apiKey
       })
 
-      sendBlock(actionReader, getBlockStub(5), 3)
+      sendNextBlock(
+        actionReader,
+        getNextBlockStub({
+          blockInfo: {
+            blockNumber: 5
+          },
+          lastIrreversibleBlockNumber: 3
+        })
+      )
 
       await actionReader.getLastIrreversibleBlockNumber().then((blockNum) => {
         expect(blockNum).toBe(3)
       })
 
-      sendBlock(actionReader, getBlockStub(6), 4)
+      sendNextBlock(
+        actionReader,
+        getNextBlockStub({
+          blockInfo: {
+            blockNumber: 6
+          },
+          lastIrreversibleBlockNumber: 4
+        })
+      )
 
       await actionReader.getLastIrreversibleBlockNumber().then((blockNum) => {
         expect(blockNum).toBe(4)
@@ -198,13 +306,29 @@ describe("DfuseActionReader", () => {
         dfuseApiKey: apiKey
       })
 
-      sendBlock(actionReader, getBlockStub(5), 4)
+      sendNextBlock(
+        actionReader,
+        getNextBlockStub({
+          blockInfo: {
+            blockNumber: 5
+          },
+          lastIrreversibleBlockNumber: 4
+        })
+      )
 
       await actionReader.getLastIrreversibleBlockNumber().then((blockNum) => {
         expect(blockNum).toBe(4)
       })
 
-      sendBlock(actionReader, getBlockStub(4), 3)
+      sendNextBlock(
+        actionReader,
+        getNextBlockStub({
+          blockInfo: {
+            blockNumber: 4
+          },
+          lastIrreversibleBlockNumber: 3
+        })
+      )
 
       await actionReader.getLastIrreversibleBlockNumber().then((blockNum) => {
         expect(blockNum).toBe(4)
