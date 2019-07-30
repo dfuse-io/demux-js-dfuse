@@ -43,13 +43,8 @@
     }
   },
   "lint-staged": {
-    "linters": {
-      "**/*.ts": [
-        "yarn lint:specific"
-      ]
-    },
-    "ignore": [
-      "**/*.d.ts"
+    "**/*.ts": [
+      "yarn lint:specific"
     ]
   },
   "devDependencies": {
