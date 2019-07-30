@@ -29,7 +29,7 @@ const handlerVersion = require("./handlerVersions/v1")
  * This ObjectActionHandler, which does not change the signature from its parent AbstractActionHandler, takes an array
  * of `HandlerVersion` objects
  */
-const actionHandler = new ObjectActionHandler([handlerVersion])
+const actionHandler = new ObjectActionHandler([handlerVersion], { validateBlockHashes: false })
 
 /*
  * Since we're reading data from dfuse.io, we can use the DfuseActionReader

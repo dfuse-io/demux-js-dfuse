@@ -1,5 +1,5 @@
 import Logger, { createLogger, LogLevel } from "bunyan"
-import { IActionReader, ActionReaderOptions, Block, BlockInfo, NextBlock, ReaderInfo } from "demux"
+import { ActionReader, ActionReaderOptions, Block, BlockInfo, NextBlock, ReaderInfo } from "demux"
 import { DfuseBlockStreamer } from "../dfuse-block-streamer"
 import { waitUntil, getBlockNumber } from "../util"
 
@@ -27,7 +27,7 @@ type DfuseActionReaderOptions = ActionReaderOptions & {
  * this is is not necessary, since we can stream only the blocks we want via the graphl api. To circumvent this
  * expectation, the streamed blocks will be put in a FIFO queue, where demux can find them.
  */
-export class DfuseActionReader implements IActionReader {
+export class DfuseActionReader implements ActionReader {
   public startAtBlock: number
   public headBlockNumber: number = 0
   public currentBlockNumber: number

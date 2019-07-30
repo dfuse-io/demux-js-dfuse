@@ -60,7 +60,7 @@ import { ObjectActionHandler } from "./ObjectActionHandler"
 import { handlerVersion } from "./handlerVersions/v1"
 import { DfuseActionReader } from "demux-js-dfuse"
 
-const actionHandler = new ObjectActionHandler([handlerVersion])
+const actionHandler = new ObjectActionHandler([handlerVersion], { validateBlockHashes: false })
 
 const dfuseActionReader = new DfuseActionReader({
   dfuseApiKey: "YOUR DFUSE API KEY",
