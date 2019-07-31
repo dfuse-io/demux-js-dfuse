@@ -14,7 +14,9 @@
 
 </div>
 
-<a href="https://www.dfuse.io" title="dfuse API for EOS" align="center"><img src="https://www.dfuse.io/hubfs/built-with-dfuse-03.png" title="dfuse API for EOS" width="210" height="auto"></a>
+<div align="center">
+   <a href="https://www.dfuse.io" title="dfuse API for EOS"><img src="https://www.dfuse.io/hubfs/built-with-dfuse-03.png" title="dfuse API for EOS" width="210" height="auto"></a>
+</div>
 
 ---
 
