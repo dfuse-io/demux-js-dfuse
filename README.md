@@ -1,3 +1,7 @@
+<h3 align="center">demux-js-dfuse</h3>
+<p align="center">A demux-js Action Reader Implementation  for dfuse.io</p>
+
+---
 
 <div align="center">
   
@@ -13,9 +17,6 @@
 </div>
 
 ---
-
-<h2 align="center">demux-js-dfuse</h2>
-<p align="center">A demux-js Action Reader Implementation  for dfuse.io</p>
 
 ## 📝 Table of Contents
 
