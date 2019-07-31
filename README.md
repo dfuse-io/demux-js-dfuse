@@ -33,9 +33,11 @@
 
 ## 🏁 Getting Started <a name = "getting_started"></a>
 
-To run a basic example, run the following command:
+To run a basic example, run this command:
 
-`yarn run:example`
+```sh
+yarn run:example
+```
 
 The code for the example can be found in the `/example` directory at the root of the project.
 
