@@ -39,7 +39,7 @@ const actionHandler = new ObjectActionHandler([handlerVersion], { validateBlockH
  * mode, where we start at an offset of the most recent blocks.
  */
 const dfuseActionReader = new DfuseActionReader({
-  startAtBlock: -100,
+  startAtBlock: -1000,
   onlyIrreversible: false,
   dfuseApiKey: process.env.DFUSE_API_KEY as string,
   query: "account:eosknightsio",

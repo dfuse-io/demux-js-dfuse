@@ -91,5 +91,8 @@
     "graphql": "^14.4.2",
     "subscriptions-transport-ws": "^0.9.16",
     "ws": "^7.1.1"
+  },
+  "peerDependencies": {
+    "demux": ">=5.0.2-557"
   }
 }

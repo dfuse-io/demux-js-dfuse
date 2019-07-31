@@ -45,7 +45,7 @@ export class DfuseActionReader implements ActionReader {
     const optionsWithDefaults = {
       startAtBlock: 1,
       onlyIrreversible: false,
-      logLevel: "info",
+      logLevel: "debug",
       ...options
     }
 
@@ -139,8 +139,6 @@ export class DfuseActionReader implements ActionReader {
   }
 
   public async getNextBlock(): Promise<NextBlock> {
-    this.log.trace("DfuseActionReader.getNextBlock()", this.nextBlockNeeded)
-
     // If the queue is empty, wait for graphql to return new results.
     await waitUntil(() => {
       return this.blockQueue.length > 0
@@ -153,6 +151,12 @@ export class DfuseActionReader implements ActionReader {
     let nextBlock: NextBlock
     const queuedBlockNumber = getBlockNumber(this.blockQueue[0])
 
+    this.log.trace(`
+      DfuseActionReader.getNextBlock()
+      Next block needed: ${this.nextBlockNeeded}
+      Queued block: ${queuedBlockNumber}
+    `)
+
     // If the block we need is higher than the queued block, shift the queue
     while (this.blockQueue.length > 0 && this.nextBlockNeeded > queuedBlockNumber) {
       this.blockQueue.shift()
@@ -160,7 +164,7 @@ export class DfuseActionReader implements ActionReader {
 
     // If the queued block is the one we need, return it
     if (this.nextBlockNeeded === queuedBlockNumber) {
-      // console.log(`getNextBlock: ${this.nextBlockNeeded} found at the start of the queue.`)
+      this.log.trace(`getNextBlock: ${this.nextBlockNeeded} found at the start of the queue.`)
 
       /*
        * Hack to make the block's previousHash property match the previous block,
@@ -168,24 +172,17 @@ export class DfuseActionReader implements ActionReader {
        * todo is there a better solution than this?
        */
       nextBlock = this.blockQueue.shift() as NextBlock
-      nextBlock.block.blockInfo.previousBlockHash = this.currentBlockData
-        ? this.currentBlockData.blockInfo.blockHash
-        : "dummy-block-hash"
+      // nextBlock.block.blockInfo.previousBlockHash = this.currentBlockData
+      //   ? this.currentBlockData.blockInfo.blockHash
+      //   : "dummy-block-hash"
 
-      // todo handle rollbacks
-      if (nextBlock.blockMeta.isRollback === false) {
-        this.acceptBlock(nextBlock.block)
-      } else {
-        // await this.resolveFork()
-      }
+      this.acceptBlock(nextBlock.block)
     } else if (this.nextBlockNeeded < queuedBlockNumber) {
       // If the next block we need is lower than the queued block, return a dummy block
       nextBlock = {
         block: this.getDefaultBlock({
           blockNumber: this.nextBlockNeeded,
-          previousBlockHash: this.currentBlockData
-            ? this.currentBlockData.blockInfo.blockHash
-            : "dummy-block-hash"
+          previousBlockHash: this.currentBlockData ? this.currentBlockData.blockInfo.blockHash : ""
         }),
         blockMeta: {
           isRollback: false,
