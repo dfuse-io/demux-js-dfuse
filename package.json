@@ -87,12 +87,10 @@
     "apollo-client": "^2.6.3",
     "apollo-link-ws": "^1.0.18",
     "bunyan": "^1.8.12",
-    "demux": "5.0.2-557",
+    "demux": "https://github.com/olivierbeaulieu/demux-js#8a3f4c79de3f3193155d96c6404ec1579cf987b8",
     "graphql": "^14.4.2",
     "subscriptions-transport-ws": "^0.9.16",
     "ws": "^7.1.1"
   },
-  "peerDependencies": {
-    "demux": ">=5.0.2-557"
-  }
+  "peerDependencies": {}
 }

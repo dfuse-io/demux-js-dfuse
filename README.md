@@ -47,7 +47,7 @@ To use dfuse as your data source, simply pass a DfuseActionReader instance to a 
 
 You will need to create your own ActionHandler. For more information on this, [visit the demux-js repository](https://github.com/EOSIO/demux-js).
 
-**It is critical that you set the ActionHandler's option `validateBlockHashes` to false. Because the dfuse API only returns the blocks that match your query, it means the chain of blocks passed through demux will be missing blocks. Without this option set, demux will not work.**
+**It is critical that you set the ActionHandler's option `validateBlocks` to false. Because the dfuse API only returns the blocks that match your query, it means the chain of blocks passed through demux will be missing blocks. Without this option set, demux will not work.**
 
 To generate a dfuse API key, visit [the dfuse website](https://www.dfuse.io).
 
@@ -64,7 +64,7 @@ import { ObjectActionHandler } from "./ObjectActionHandler"
 import { handlerVersion } from "./handlerVersions/v1"
 import { DfuseActionReader } from "demux-js-dfuse"
 
-const actionHandler = new ObjectActionHandler([handlerVersion], { validateBlockHashes: false })
+const actionHandler = new ObjectActionHandler([handlerVersion], { validateBlocks: false })
 
 const dfuseActionReader = new DfuseActionReader({
   dfuseApiKey: "YOUR DFUSE API KEY",

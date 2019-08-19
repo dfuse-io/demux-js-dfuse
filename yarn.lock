@@ -1383,10 +1383,9 @@ delegates@^1.0.0:
   resolved "https://registry.yarnpkg.com/delegates/-/delegates-1.0.0.tgz#84c6e159b81904fdca59a0ef44cd870d31250f9a"
   integrity sha1-hMbhWbgZBP3KWaDvRM2HDTElD5o=
 
-demux@5.0.2-557:
-  version "5.0.2-557"
-  resolved "https://registry.yarnpkg.com/demux/-/demux-5.0.2-557.tgz#ca2cb79e862b94a87feba53ee9f94d7ac66182d9"
-  integrity sha512-edXSYPJFsuS6qOcyUeVZcstePltVyxIEUOvJOdlWcW1GMni1wKK7f8ApJkjo0EFqpqPpwDWEPvuQbp8Xq0QNtA==
+"demux@https://github.com/olivierbeaulieu/demux-js#8a3f4c79de3f3193155d96c6404ec1579cf987b8":
+  version "5.0.2"
+  resolved "https://github.com/olivierbeaulieu/demux-js#8a3f4c79de3f3193155d96c6404ec1579cf987b8"
   dependencies:
     bunyan "1.8.12"
     express "4.16.4"

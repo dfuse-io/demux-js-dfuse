@@ -88,18 +88,11 @@ export class DfuseBlockStreamer {
         this.log.trace("DfuseBlockStreamer GraphQL subscription started")
       },
       next: (value: any) => {
-        /**
-         * This promise queueing trick is important because onTransactionReceived
-         * might take a while to resolve if it has to create a large number of dummy
-         * blocks, to fill large gaps between blocks returned by dfuse.
-         */
-        this.transactionProcessing = this.transactionProcessing.then(async () => {
-          await this.onTransactionReceived(value.data.searchTransactionsForward)
-        })
+        this.onTransactionReceived(value.data.searchTransactionsForward)
       },
       error: (error: Error) => {
         // TODO should we be doing anything else?
-        // this.log.error("DfuseBlockStreamer GraphQL subscription error", error.message)
+        this.log.error("DfuseBlockStreamer GraphQL subscription error", error.message)
       },
       complete: () => {
         // TODO: how to handle completion? Will we ever reach completion?
@@ -121,6 +114,7 @@ export class DfuseBlockStreamer {
      * If trace is null, it means that we received a liveMarker.
      */
     if (!trace) {
+      this.log.info("DfuseBlockStreamer: Live marker has been reached.")
       this.liveMarkerReached = true
       return
     }

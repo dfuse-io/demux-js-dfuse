@@ -139,6 +139,8 @@ export class DfuseActionReader implements ActionReader {
   }
 
   public async getNextBlock(): Promise<NextBlock> {
+    this.log.trace("getNextBlock() called. queue length:", this.blockQueue.length)
+
     // If the queue is empty, wait for graphql to return new results.
     await waitUntil(() => {
       return this.blockQueue.length > 0
@@ -155,10 +157,14 @@ export class DfuseActionReader implements ActionReader {
       DfuseActionReader.getNextBlock()
       Next block needed: ${this.nextBlockNeeded}
       Queued block: ${queuedBlockNumber}
+      Block distance: ${queuedBlockNumber - this.nextBlockNeeded}
     `)
 
     // If the block we need is higher than the queued block, shift the queue
     while (this.blockQueue.length > 0 && this.nextBlockNeeded > queuedBlockNumber) {
+      this.log.trace(
+        "getNextBlock: nextBlockNeeded is higher than the queued block. Shifting queue."
+      )
       this.blockQueue.shift()
     }
 
