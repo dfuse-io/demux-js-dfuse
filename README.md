@@ -1,12 +1,10 @@
-<!-- <p align="center">
-  <a href="" rel="noopener">
- <img width=200px height=200px src="https://i.imgur.com/6wj0hh6.jpg" alt="Project logo"></a>
-</p> -->
-
 <h3 align="center">demux-js-dfuse</h3>
+<p align="center">A demux-js Action Reader Implementation  for dfuse.io</p>
+
+---
 
 <div align="center">
-
+  
 [![Status](https://img.shields.io/badge/status-alpha-blue.svg)]()
 [![GitHub Issues](https://img.shields.io/github/issues/dfuse-io/demux-js-dfuse.svg)](https://github.com/dfuse-io/demux-js-dfuse/issues)
 [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/dfuse-io/demux-js-dfuse.svg)](https://github.com/dfuse-io/demux-js-dfuse/pulls)
@@ -14,11 +12,11 @@
 
 </div>
 
----
+<div align="center">
+   <a href="https://www.dfuse.io" title="dfuse API for EOS"><img src="https://www.dfuse.io/hubfs/built-with-dfuse-03.png" title="dfuse API for EOS" width="210" height="auto"></a>
+</div>
 
-<p align="center">A demux-js Action Reader Implementation  for dfuse.io
-    <br> 
-</p>
+---
 
 ## 📝 Table of Contents
 
