@@ -1,5 +1,5 @@
 {
-  "name": "@dfuse/client",
+  "name": "demux-dfuse",
   "version": "0.2.6",
   "description": "A demux-js Action Reader Implementation for dfuse.io",
   "sideEffects": false,
