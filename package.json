@@ -58,7 +58,7 @@
     "jest": "^24.1.0",
     "jest-expect-message": "^1.0.2",
     "lint-staged": "^9.2.1",
-    "node-fetch": "^2.6.0",
+    "node-fetch": "^2.6.7",
     "prettier": "^1.14.3",
     "pretty-quick": "^1.8.0",
     "rimraf": "^2.6.3",
